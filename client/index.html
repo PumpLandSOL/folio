@@ -1,0 +1,130 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Folio — a folio of stocks, a dollar that pays</title><link rel="stylesheet" href="/folio.css"><link rel="stylesheet" href="/hl.css"><link rel="stylesheet" href="/landing.css">
+<meta property="og:url" content="https://foliobnb.xyz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@FolioBNB"><meta property="og:title" content="Folio — a folio of stocks, a dollar that pays"><meta property="og:description" content="Mint fUSD against tokenized equities. Stake it. Get paid in stock every 15 minutes. Trade perps with it. BNB Chain.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23f8f6f2'/%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23b8933d' stroke-width='2'/%3E%3Ccircle cx='32' cy='30' r='11' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3Ccircle cx='19.5' cy='29' r='4.5' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3Ccircle cx='44.5' cy='29' r='4.5' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3C/svg%3E"></head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+<symbol id="zMonkey" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" stroke-dasharray="1.5 3"/><circle cx="32" cy="32" r="26.5"/>
+<circle cx="32" cy="29" r="11"/><circle cx="19.5" cy="28" r="4.2"/><circle cx="44.5" cy="28" r="4.2"/>
+<path d="M24 31c1.5-6 5-9 8-9s6.5 3 8 9c-1.5 4.5-4.5 7.5-8 7.5s-6.5-3-8-7.5z"/>
+<path d="M26.5 26.5c1-1 2.5-1.2 3.6-.6M33.9 25.9c1.1-.6 2.6-.4 3.6.6"/>
+<circle cx="28.4" cy="28.8" r=".9" fill="currentColor"/><circle cx="35.6" cy="28.8" r=".9" fill="currentColor"/>
+<path d="M31.2 33.2h1.6"/>
+<path d="M32 40c-8 0-14 4-14 10M32 40c8 0 14 4 14 10M43 47c4-1 7 1 8 5s-2 6-5 4"/>
+</symbol>
+<symbol id="zHorse" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" stroke-dasharray="1.5 3"/><circle cx="32" cy="32" r="26.5"/>
+<path d="M18 52c2-14 6-24 14-30l3-8 3 7c6 1 10 6 13 15c1 3 1 5-1 7c-2 1-5 0-7-2c-3-2-6-2-8 0c-4 3-8 9-9 11"/>
+<path d="M32 22c-3 2-5 5-6 9M35 21c-2 3-4 6-4 10M38 22c-2 3-3 6-3 9"/>
+<circle cx="43" cy="30" r="1" fill="currentColor"/><path d="M48 39c.6.4 1 1 1 1.6"/>
+<path d="M36 41c-2 1-4 3-5 5"/>
+</symbol></svg>
+<header class="top"><div class="wrap">
+ <a class="brand" href="/"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><b>Folio</b></a>
+ <nav><a href="/#ledger">Ledger</a><a href="/#how">Mechanics</a><a href="/#trade">Trade</a><a href="/#reserve">Reserve</a><a href="/docs">Docs</a><a href="/x" target="_blank" rel="noopener">𝕏</a><a class="btn acc mini" href="/app">Open app</a></nav>
+</div></header>
+
+<section class="hero2"><div class="wrap hero2i">
+ <div class="hcopy">
+  <div class="eyebrow"><span>No. 54</span><i></i><span>BNB Chain</span><i></i><span>Est. MMXXVI</span></div>
+  <h1>A folio of stocks.<br>A dollar that <em>pays you back.</em></h1>
+  <p class="lede">Deposit tokenized equities, mint <b>fUSD</b>. Stake it. Hold $FOLIO and receive stock every fifteen minutes. Trade perps on the very stocks that back it.</p>
+  <div class="ctas"><a class="btn acc" href="/app">Mint fUSD</a><a class="btn ghost" href="#how">Read the mechanics</a></div>
+  <dl class="miniledger"><div><dt>Peg</dt><dd>$1.00</dd></div><div><dt>sfUSD target</dt><dd>6.00%</dd></div><div><dt>Borrow APR</dt><dd>3.00%</dd></div><div><dt>Dividend cadence</dt><dd>15 min</dd></div></dl>
+ </div>
+ <div class="hobj">
+  <svg class="seal wm2" aria-hidden="true"><use href="#zHorse"/></svg>
+  <div class="folio-card">
+   <div class="fc-head"><span>Protocol folio</span><b id="asof">—</b></div>
+   <div class="fc-row"><span>fUSD outstanding</span><b id="kSupply">—</b></div>
+   <div class="fc-row"><span>Total backing</span><b id="kTvl">—</b></div>
+   <div class="fc-row"><span>Backing ratio</span><b id="kBack">—</b></div>
+   <div class="fc-row gold"><span>Stock dividends paid</span><b id="kDiv">—</b></div>
+   <div class="fc-row"><span>Next dividend</span><b id="kNext">—</b></div>
+   <div class="fc-row"><span>Perp open interest</span><b id="kOI">—</b></div>
+   <div class="fc-tape" id="tape">loading oracle…</div>
+  </div>
+ </div>
+</div></section>
+
+<div class="wrap">
+ <section class="sec rule" id="ledger"><div class="sechead"><span class="caps">The ledger</span><h2>Four entries. One dollar.</h2></div>
+  <div class="ledger">
+   <a class="lrow" href="/app"><span class="lno">01</span><span class="lname"><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg>Hold</span><span class="ldesc">Stable dollars backed by tokenized equities, BNB and USDT. Redeemable 1:1 through the PSM.</span><span class="lval">$1.00<small>target peg</small></span></a>
+   <a class="lrow" href="/app"><span class="lno">02</span><span class="lname"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg>Stake</span><span class="ldesc">sfUSD accretes protocol revenue — stability fees first, surplus buffer second.</span><span class="lval">6.00%<small>est. apy</small></span></a>
+   <a class="lrow" href="/app"><span class="lno">03</span><span class="lname"><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg>Borrow</span><span class="ldesc">Isolated vaults per stock. Tier-1 55/65, Tier-2 40/52, BNB 75/82, USDT 90/95.</span><span class="lval">3.00%<small>borrow apr</small></span></a>
+   <a class="lrow" href="/app"><span class="lno">04</span><span class="lname"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg>Trade</span><span class="ldesc">Perpetuals on stocks and crypto, margined in fUSD, marked to Pyth.</span><span class="lval">25×<small>max leverage</small></span></a>
+  </div>
+ </section>
+
+ <section class="sec" id="how"><div class="sechead"><span class="caps">Mechanics</span><h2>How the folio compounds.</h2></div>
+  <ol class="timeline">
+   <li><b>Deposit</b><p>Approved stock tokens, BNB or USDT enter an isolated vault. Collateral stays on chain, visible, under tiered LTV and liquidation rules.</p></li>
+   <li><b>Mint</b><p>fUSD is issued to LTV. 0.10% origination, 3.00% stability fee accruing by the second. Health below 1.0 is bought by the stability pool at a 5% discount.</p></li>
+   <li><b>Earn</b><p>Every fee — origination, stability, perp taker, liquidation — lands in one revenue pot. sfUSD stakers draw on it first.</p></li>
+   <li><b>Distribute</b><p>At each quarter-hour, half the pot buys a tokenized stock at oracle and is airdropped to $FOLIO holders; half deepens locked liquidity.</p></li>
+   <li><b>Trade</b><p>fUSD is margin. Long or short NVDA, HOOD, SPY, BTC, BNB — up to 25× — and every trade pays the next dividend.</p></li>
+  </ol>
+ </section>
+
+ <section class="sec" id="trade"><div class="sechead"><span class="caps">Trade</span><h2>Trade the same book.</h2></div><p class="sub">Perpetuals on the stocks that back fUSD — margined in fUSD, marked to Pyth, funded hourly. Every fee pays the dividend.</p>
+  <div class="hl">
+   <div class="hlhead"><span><span class="dot"></span><b>FOLIO PERPS</b> · isolated margin · fUSD</span><span id="hlOI">open interest —</span></div>
+   <div class="strip" id="hlStrip"></div>
+   <div class="grid2">
+    <div style="overflow:auto"><table><thead><tr><th>Market</th><th class="num">Mark</th><th class="num">Δ</th><th>Chart</th><th class="num">Funding/h</th><th class="num">Long OI</th><th class="num">Short OI</th><th class="num">Max lev</th></tr></thead><tbody id="hlRows"></tbody></table></div>
+    <div class="ticket"><div class="ls"><div class="on">Long</div><div>Short</div></div>
+     <div class="lab">Market</div><div class="box"><b id="tkSym">NVDA</b><span id="tkPx">—</span></div>
+     <div class="lab">Margin</div><div class="box">100.00<span>fUSD</span></div>
+     <div class="lab">Leverage · 10×</div><div class="lev"><i></i><b></b></div>
+     <div class="kv"><span>Notional</span><b>1,000.00 fUSD</b></div><div class="kv"><span>Est. liq. price</span><b id="tkLiq">—</b></div><div class="kv"><span>Fee</span><b>0.06%</b></div><div class="kv"><span>Maintenance</span><b>0.5%</b></div>
+     <a class="go" href="/app">Open a position →</a></div>
+   </div>
+  </div></section>
+
+ <section class="sec" id="reserve"><div class="sechead"><span class="caps">Reserve</span><h2>What stands behind fUSD.</h2></div>
+  <div class="reserve"><div id="mk"></div>
+   <aside class="rnote"><svg class="seal lg" aria-hidden="true"><use href="#zHorse"/></svg><p>Collateral is priced by Pyth every five seconds. USDT is pinned to $1 and held idle in the PSM for 1:1 redemption. Nothing here is rehypothecated.</p><a class="more" href="/docs">Full parameters →</a></aside></div>
+ </section>
+
+ <section class="sec"><div class="sechead"><span class="caps">Against the field</span><h2>Compared to other stable dollars.</h2></div>
+  <table class="cmp"><thead><tr><th></th><th>fUSD</th><th>nUSD</th><th>aUSD</th><th>USDC</th></tr></thead><tbody>
+   <tr><td>Backed by</td><td>Stocks · BNB · USDT</td><td>Stocks · USDC</td><td>Stocks · BNB · USDT</td><td>Cash &amp; T-bills</td></tr>
+   <tr><td>Staked yield</td><td class="yes">6% target</td><td class="yes">6% target</td><td class="no">—</td><td class="no">—</td></tr>
+   <tr><td>Stability pool</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td></tr>
+   <tr><td>Stock dividends to holders</td><td class="yes">every 15 min</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+   <tr><td>Perps margined in it</td><td class="yes">✓ up to 25×</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+   <tr><td>Chain</td><td>BNB</td><td>Solana</td><td>Robinhood</td><td>Many</td></tr>
+  </tbody></table>
+  <p class="footnote"><sup>†</sup> Lineage — Folio draws its collateral model from Nest (Solana), its tiered markets and stability pool from Arrow (Robinhood Chain), its 15-minute stock-dividend engine from The Index (Robinhood Chain), and adds perpetuals of its own.</p>
+ </section>
+
+ <section class="sec"><div class="sechead"><span class="caps">Questions</span><h2>Asked, answered.</h2></div><div class="faq">
+  <details open><summary>What is fUSD?</summary><p>A dollar minted against tokenized stocks, ETFs, BNB or USDT in isolated, overcollateralized vaults. Redeemable 1:1 for USDT through the PSM while reserves are idle.</p></details>
+  <details><summary>Where does the yield come from?</summary><p>sfUSD is funded by borrower stability fees (3% APR) first and the surplus buffer second, targeting 6%. The stability pool earns liquidated collateral at a 5% discount. Dividends come from every protocol fee.</p></details>
+  <details><summary>How do the stock dividends work?</summary><p>Every 15 minutes the revenue pot is split: 50% buys a tokenized stock (rotating NVDA → AAPL → GOOGL → HOOD → META → SPY) at oracle price and is airdropped to $FOLIO holders pro-rata; 50% goes to locked FOLIO liquidity.</p></details>
+  <details><summary>How do perps work?</summary><p>Isolated positions margined in fUSD, marked to Pyth. Up to 25× on BTC/ETH/BNB/SOL, 10× on stocks and ETFs. 0.06% taker fee, 0.5% maintenance margin, hourly funding.</p></details>
+  <details><summary>Which chain?</summary><p>BNB Chain (EVM). Connect any EVM wallet.</p></details>
+  <details><summary>Is this financial advice?</summary><p>No. Overcollateralized lending and leveraged trading can lose money.</p></details>
+ </div></section>
+</div>
+<footer><div class="gold-rule"></div><div class="wrap"><span class="seals"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg></span><span>Folio · $FOLIO · BNB Chain · <a href="/x" target="_blank" rel="noopener">@FolioBNB</a></span><span>fUSD · sfUSD · stability pool · dividends · perps · foliobnb.xyz</span><span id="pxFolio"></span></div></footer>
+<script>
+const fmt=(v,d=2)=>(+v||0).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});const fpx=v=>v>=1000?fmt(v,2):v>=1?fmt(v,v>=100?2:3):(+v).toFixed(6);
+const cd=ms=>{if(ms<=0)return'now';const s=Math.floor(ms/1e3);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};const $=id=>document.getElementById(id);
+async function go(){const S=await (await fetch('/api/state')).json();
+ $('tape').innerHTML=Object.entries(S.px).filter(([s])=>s!=='USDT').map(([s,v])=>`<span><b>${s}</b> $${fpx(v)}</span>`).join('');
+ $('asof').textContent=new Date(S.t).toISOString().slice(0,16).replace('T',' ')+' UTC';
+ $('kSupply').textContent=fmt(S.supply,0);$('kTvl').textContent='$'+fmt(S.tvl,0);$('kBack').textContent=S.backing?fmt(S.backing*100,0)+'%':'—';
+ $('kDiv').textContent='$'+fmt(S.div.paid);$('kNext').textContent=cd(S.div.next-S.t);$('kOI').textContent='$'+fmt(S.perpOI,0);
+ $('mk').innerHTML=`<div class="two"><table><thead><tr><th>Collateral</th><th class="num">Oracle</th><th class="num">LTV</th><th class="num">Liq</th></tr></thead><tbody>${Object.entries(S.markets).map(([s,m])=>`<tr><td><b>${s}</b> <span class="tag">${m.tier}</span></td><td class="num">$${fpx(m.px)}</td><td class="num">${(m.ltv*100).toFixed(0)}%</td><td class="num">${(m.liq*100).toFixed(0)}%</td></tr>`).join('')}</tbody></table>
+ <table><thead><tr><th>Perp</th><th class="num">Mark</th><th class="num">Max lev</th></tr></thead><tbody>${S.perps.map(p=>`<tr><td><b>${p.sym}</b></td><td class="num">$${fpx(p.px)}</td><td class="num">${p.maxLev}×</td></tr>`).join('')}</tbody></table></div>`;
+ const H=window.__hist=window.__hist||{};S.perps.forEach(p=>{(H[p.sym]=H[p.sym]||[]).push(p.px);if(H[p.sym].length>40)H[p.sym].shift()});
+ const spark=a=>{if(!a||a.length<2)return'';const mn=Math.min(...a),mx=Math.max(...a),r=mx-mn||1;const pts=a.map((v,i)=>(i/(a.length-1)*80)+','+(20-(v-mn)/r*16-2)).join(' ');const c=a[a.length-1]>=a[0]?'#c9a45c':'#c9563f';return '<svg class="spark" viewBox="0 0 80 22" style="color:'+c+'"><polyline points="'+pts+'" fill="none" stroke="'+c+'" stroke-width="1.5"/></svg>'};
+ $('hlRows').innerHTML=S.perps.map(p=>{const a=H[p.sym],ch=a.length>1?(a[a.length-1]/a[0]-1)*100:0;return '<tr><td><b>'+p.sym+'</b>-PERP</td><td class="num">'+fpx(p.px)+'</td><td class="num '+(ch>=0?'up':'dn')+'">'+(ch>=0?'+':'')+ch.toFixed(3)+'%</td><td>'+spark(a)+'</td><td class="num '+(p.funding.rate>0?'dn':p.funding.rate<0?'up':'')+'">'+(p.funding.rate*100).toFixed(4)+'%</td><td class="num">'+fmt(p.funding.longOI||0,0)+'</td><td class="num">'+fmt(p.funding.shortOI||0,0)+'</td><td class="num">'+p.maxLev+'×</td></tr>'}).join('');
+ $('hlOI').textContent='open interest $'+fmt(S.perpOI,0)+' · '+S.perps.length+' markets';
+ $('hlStrip').innerHTML=S.perps.slice(0,8).map(p=>'<span><b>'+p.sym+'</b> '+fpx(p.px)+'</span>').join('');
+ const nv=S.perps.find(p=>p.sym==='NVDA');if(nv){$('tkPx').textContent=fpx(nv.px);$('tkLiq').textContent=fpx(nv.px*(1-1/10+0.005))}
+ if(S.folio.price)$('pxFolio').textContent='$FOLIO $'+fpx(S.folio.price)}
+go();setInterval(go,6000);
+</script>
+</body></html>

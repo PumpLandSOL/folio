@@ -1,0 +1,121 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Folio — app</title><link rel="stylesheet" href="/folio.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23f8f6f2'/%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23b8933d' stroke-width='2'/%3E%3Ccircle cx='32' cy='30' r='11' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3Ccircle cx='19.5' cy='29' r='4.5' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3Ccircle cx='44.5' cy='29' r='4.5' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3C/svg%3E"></head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+<symbol id="zMonkey" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" stroke-dasharray="1.5 3"/><circle cx="32" cy="32" r="26.5"/>
+<circle cx="32" cy="29" r="11"/><circle cx="19.5" cy="28" r="4.2"/><circle cx="44.5" cy="28" r="4.2"/>
+<path d="M24 31c1.5-6 5-9 8-9s6.5 3 8 9c-1.5 4.5-4.5 7.5-8 7.5s-6.5-3-8-7.5z"/>
+<path d="M26.5 26.5c1-1 2.5-1.2 3.6-.6M33.9 25.9c1.1-.6 2.6-.4 3.6.6"/>
+<circle cx="28.4" cy="28.8" r=".9" fill="currentColor"/><circle cx="35.6" cy="28.8" r=".9" fill="currentColor"/>
+<path d="M31.2 33.2h1.6"/>
+<path d="M32 40c-8 0-14 4-14 10M32 40c8 0 14 4 14 10M43 47c4-1 7 1 8 5s-2 6-5 4"/>
+</symbol>
+<symbol id="zHorse" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" stroke-dasharray="1.5 3"/><circle cx="32" cy="32" r="26.5"/>
+<path d="M18 52c2-14 6-24 14-30l3-8 3 7c6 1 10 6 13 15c1 3 1 5-1 7c-2 1-5 0-7-2c-3-2-6-2-8 0c-4 3-8 9-9 11"/>
+<path d="M32 22c-3 2-5 5-6 9M35 21c-2 3-4 6-4 10M38 22c-2 3-3 6-3 9"/>
+<circle cx="43" cy="30" r="1" fill="currentColor"/><path d="M48 39c.6.4 1 1 1 1.6"/>
+<path d="M36 41c-2 1-4 3-5 5"/>
+</symbol></svg>
+<header class="top"><div class="wrap">
+ <a class="brand" href="/"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><b>Folio</b></a>
+ <nav><a href="/">Home</a><a class="on" href="/app">fUSD</a><a href="/docs">Docs</a><a href="/x" target="_blank" rel="noopener">𝕏</a><button class="btn mini" id="walletBtn">Connect wallet</button></nav>
+</div></header>
+<div class="tape"><div class="wrap" id="tape">loading oracle…</div></div>
+<div class="wrap">
+ <div class="statement" id="acct" style="display:none"><div class="head"><span>Account · <span id="acctW"></span></span><b id="acctNav">—</b></div>
+  <div class="stats">
+   <div class="stat"><b id="sFusd">—</b><span>fUSD wallet</span></div><div class="stat"><b id="sSf">—</b><span>sfUSD value</span></div><div class="stat"><b id="sDebt">—</b><span>fUSD debt</span></div>
+   <div class="stat"><b id="sColl">—</b><span>collateral value</span></div><div class="stat"><b id="sSp">—</b><span>stability pool</span></div><div class="stat acc"><b id="sDiv">—</b><span>stock dividends rec'd</span></div><div class="stat"><b id="sPnl">—</b><span>perps realized</span></div>
+  </div></div>
+ <div class="tabs" id="tabs"></div>
+ <div id="view"></div>
+</div>
+<footer><div class="gold-rule"></div><div class="wrap"><span class="seals"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg></span><span>Folio · $FOLIO · BNB Chain · pyth oracle</span><span>fUSD · sfUSD · 15-minute stock dividends · perps</span><span id="pxFolio"></span></div></footer>
+<div class="toast" id="toast"></div>
+<script>
+const $=id=>document.getElementById(id);let S=null,WALLET=localStorage.getItem('folio_w')||'',TAB=localStorage.getItem('folio_tab')||'mint',F={};
+const fmt=(v,d=2)=>(+v||0).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+const fpx=v=>v>=1000?fmt(v,2):v>=1?fmt(v,v>=100?2:3):(+v).toFixed(6);
+const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600)};
+const hfCls=h=>h==null||h>1.5?'ok':h>1.1?'warn':'bad';const hfTxt=h=>h==null?'∞':h.toFixed(2);
+async function api(u,d){const r=await fetch(u,d?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(d)}:undefined);return r.json()}
+async function act(u,d){if(!WALLET)return connect();const r=await api(u,{wallet:WALLET,...d});if(r.error)return toast(r.error);toast('Done');load()}
+async function connect(){if(window.ethereum){try{const a=await window.ethereum.request({method:'eth_requestAccounts'});if(a&&a[0])return setWallet(a[0])}catch(e){}}const w=prompt('Paste a 0x address:');if(w&&/^0x[a-fA-F0-9]{40}$/.test(w.trim()))setWallet(w.trim())}
+function setWallet(w){WALLET=w.toLowerCase();localStorage.setItem('folio_w',WALLET);renderWallet();load()}
+function renderWallet(){const b=$('walletBtn');if(WALLET){b.textContent=WALLET.slice(0,6)+'…'+WALLET.slice(-4);b.className='btn ghost mini';b.onclick=()=>{if(confirm('Disconnect?')){WALLET='';localStorage.removeItem('folio_w');renderWallet();load()}}}else{b.textContent='Connect wallet';b.className='btn mini';b.onclick=connect}}
+async function load(){try{S=await api('/api/state'+(WALLET?'?w='+WALLET:''));render()}catch(e){}}
+const TABS=[['mint','Mint fUSD'],['stake','Stake & Stability'],['div','Dividends'],['perps','Perps'],['activity','Activity']];
+function render(){
+  if(!S)return;
+  $('tape').innerHTML=Object.entries(S.px).filter(([s])=>s!=='USDT').map(([s,v])=>`<span><b>${s}</b> $${fpx(v)}</span>`).join('')+`<span><b>fUSD supply</b> ${fmt(S.supply,0)}</span><span><b>backing</b> ${S.backing?fmt(S.backing*100,0)+'%':'—'}</span><span><b>next dividend</b> ${cd(S.div.next-S.t)}</span>`;
+  $('tabs').innerHTML=TABS.map(([k,l])=>`<button class="${TAB===k?'on':''}" onclick="TAB='${k}';localStorage.setItem('folio_tab','${k}');render()">${l}</button>`).join('');
+  const me=S.me;
+  if(me){$('acct').style.display='';$('acctW').textContent=me.wallet;$('acctNav').textContent='NAV $'+fmt(me.nav);$('sFusd').textContent=fmt(me.bal.fUSD);$('sSf').textContent=fmt(me.sfusd);$('sDebt').textContent=fmt(me.vaults.reduce((a,v)=>a+v.debt,0));$('sColl').textContent='$'+fmt(me.vaults.reduce((a,v)=>a+v.collValue,0));$('sSp').textContent=fmt(me.spVal);
+    $('sDiv').textContent='$'+fmt(Object.entries(me.divs).reduce((a,[s,n])=>a+n*(S.px[s]||0),0));$('sPnl').textContent=(me.pnl>=0?'+':'')+fmt(me.pnl);}
+  else $('acct').style.display='none';
+  const active=document.activeElement;if(active&&active.tagName==='INPUT'&&$('view').contains(active))return;
+  $('view').innerHTML=({mint:vMint,stake:vStake,div:vDiv,perps:vPerps,activity:vAct})[TAB]();
+  $('pxFolio').textContent=S.folio.price?'$FOLIO $'+fpx(S.folio.price):'';
+}
+const cd=ms=>{if(ms<=0)return'now';const s=Math.floor(ms/1e3);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
+const inp=(id,label,ph,hint,type='')=>`<div class="field"><label>${label}</label><input id="${id}" inputmode="decimal" placeholder="${ph}" value="${F[id]||''}" oninput="F['${id}']=this.value"><div class="hint">${hint||''}</div></div>`;
+const val=id=>parseFloat(($(id)&&$(id).value||'').replace(/,/g,''));
+/* ---------- MINT ---------- */
+function vMint(){
+  const me=S.me;const sel=F.mSym||'NVDA';const m=S.markets[sel];const v=me&&me.vaults.find(x=>x.sym===sel);
+  const rows=Object.entries(S.markets).map(([s,m])=>`<tr onclick="F.mSym='${s}';render()" style="cursor:pointer;${sel===s?'background:rgba(107,155,122,.14)':''}"><td><b>${s}</b> <span class="tag">${m.tier}</span></td><td class="num">$${fpx(m.px)}</td><td class="num">${(m.ltv*100).toFixed(0)}%</td><td class="num">${(m.liq*100).toFixed(0)}%</td><td class="num">${fmt(m.coll*m.px,0)}</td><td class="num">${fmt(m.debt,0)}</td><td class="num">${me?fmt(me.bal[s]||0,4):'—'}</td></tr>`).join('');
+  return `<div class="two"><div><span class="kicker">Collateral markets · isolated · Arrow tiers</span>
+   <table><thead><tr><th>Asset</th><th class="num">Oracle</th><th class="num">Max LTV</th><th class="num">Liq. thr.</th><th class="num">Deposited $</th><th class="num">fUSD debt</th><th class="num">Your wallet</th></tr></thead><tbody>${rows}</tbody></table>
+   ${me&&me.vaults.length?`<div class="sec" style="margin:28px 0"><span class="kicker">Your vaults</span><table><thead><tr><th>Market</th><th class="num">Collateral</th><th class="num">Value</th><th class="num">Debt</th><th class="num">Health</th><th class="num">Liq. price</th></tr></thead><tbody>${me.vaults.map(v=>`<tr onclick="F.mSym='${v.sym}';render()" style="cursor:pointer"><td><b>${v.sym}</b></td><td class="num">${fmt(v.coll,4)}</td><td class="num">$${fmt(v.collValue)}</td><td class="num">${fmt(v.debt)}</td><td class="num hf ${hfCls(v.hf)}">${hfTxt(v.hf)}</td><td class="num">${v.liqPrice?'$'+fpx(v.liqPrice):'—'}</td></tr>`).join('')}</tbody></table></div>`:''}
+   <div class="panel" style="margin-top:24px"><span class="kicker">Peg stability module</span><h3>USDT ⇄ fUSD · 1:1 · zero fee</h3><p style="color:var(--mut);font-size:12px">PSM reserve: ${fmt(S.psm)} USDT idle · your USDT ${me?fmt(me.bal.USDT):'—'}</p>
+    ${inp('psmAmt','Amount','100')}<div class="row"><button class="btn" onclick="act('/api/psm',{dir:'in',amount:val('psmAmt')})">USDT → fUSD</button><button class="btn ghost" onclick="act('/api/psm',{dir:'out',amount:val('psmAmt')})">fUSD → USDT</button></div></div>
+  </div>
+  <aside><div class="panel"><span class="kicker">${m.tier} · LTV ${(m.ltv*100).toFixed(0)}% · liq ${(m.liq*100).toFixed(0)}%</span><h3>${sel} vault</h3>
+   <p style="font-size:12px;color:var(--mut)">Oracle $${fpx(m.px)} · stability fee 3.00% APR · origination 0.10%</p>
+   ${v?`<div class="stats" style="border:1px solid var(--rule);margin:10px 0"><div class="stat"><b>${fmt(v.coll,4)}</b><span>${sel} locked</span></div><div class="stat"><b>${fmt(v.debt)}</b><span>fUSD debt</span></div><div class="stat"><b class="hf ${hfCls(v.hf)}">${hfTxt(v.hf)}</b><span>health</span></div><div class="stat"><b>${fmt(v.maxMint)}</b><span>mintable</span></div></div>`:''}
+   ${inp('dAmt','Deposit '+sel,'1.0','wallet: '+(me?fmt(me.bal[sel]||0,4):'—'))}<div class="row"><button class="btn" onclick="act('/api/deposit',{sym:'${sel}',amount:val('dAmt')})">Deposit</button><button class="btn ghost" onclick="act('/api/withdraw',{sym:'${sel}',amount:val('dAmt')})">Withdraw</button></div>
+   ${inp('mAmt','Mint / repay fUSD','100',v?'max mint '+fmt(v.maxMint)+' fUSD':'deposit first')}<div class="row"><button class="btn acc" onclick="act('/api/mint',{sym:'${sel}',amount:val('mAmt')})">Mint fUSD</button><button class="btn ghost" onclick="act('/api/repay',{sym:'${sel}',amount:val('mAmt')})">Repay</button></div>
+   <p style="font-size:11px;color:var(--mut);margin-top:12px">Liquidation at health &lt; 1.0 — the stability pool burns your debt and takes collateral 5% under oracle.</p></div></aside></div>`;
+}
+/* ---------- STAKE ---------- */
+function vStake(){const me=S.me;const gains=Object.entries(S.sp.gains).filter(([,v])=>v>1e-9);
+  return `<div class="two"><div>
+   <div class="panel"><span class="kicker">sfUSD · target ${(S.stake.apy*100).toFixed(0)}% APY</span><h3>Stake fUSD → sfUSD</h3><p style="color:var(--ink2);font-size:13px">Share token that accretes value. Funded by borrower stability fees first, surplus buffer second. Exit fee = one day of target APR, burned.</p>
+    <div class="stats" style="border:1px solid var(--rule);margin:12px 0"><div class="stat"><b>${fmt(S.stake.pool)}</b><span>fUSD staked</span></div><div class="stat"><b>${S.stake.pps.toFixed(6)}</b><span>sfUSD price</span></div><div class="stat"><b>${me?fmt(me.sfusd):'—'}</b><span>your sfUSD value</span></div></div>
+    ${inp('stAmt','fUSD to stake','100','wallet '+(me?fmt(me.bal.fUSD):'—'))}<div class="row"><button class="btn acc" onclick="act('/api/stake',{amount:val('stAmt')})">Stake</button><button class="btn ghost" onclick="act('/api/unstake',{shares:val('stAmt')/S.stake.pps})">Unstake (fUSD value)</button></div></div>
+   <div class="panel" style="margin-top:24px"><span class="kicker">Stability pool · liquidation backstop</span><h3>Earn liquidated collateral</h3><p style="color:var(--ink2);font-size:13px">Deposit fUSD. When a vault's health drops below 1.0 the pool burns its debt and receives the collateral at a 5% discount, pro-rata to depositors.</p>
+    <div class="stats" style="border:1px solid var(--rule);margin:12px 0"><div class="stat"><b>${fmt(S.sp.pool)}</b><span>fUSD in pool</span></div><div class="stat"><b>${me?fmt(me.spVal):'—'}</b><span>your share</span></div><div class="stat"><b>${gains.length?gains.map(([s,v])=>fmt(v,3)+' '+s).join(' · '):'—'}</b><span>collateral gains</span></div></div>
+    ${inp('spAmt','fUSD','100')}<div class="row"><button class="btn" onclick="act('/api/sp/deposit',{amount:val('spAmt')})">Deposit</button><button class="btn ghost" onclick="act('/api/sp/withdraw',{shares:S.sp.pool>0?val('spAmt')/(S.sp.pool/(S.sp.shares||1)):val('spAmt')})">Withdraw</button></div></div>
+  </div><aside><div class="panel"><span class="kicker">Protocol</span><h3>Solvency</h3><table><tbody>
+   <tr><td>fUSD supply</td><td class="num">${fmt(S.supply)}</td></tr><tr><td>Collateral + PSM (TVL)</td><td class="num">$${fmt(S.tvl)}</td></tr><tr><td>Backing ratio</td><td class="num">${S.backing?fmt(S.backing*100,1)+'%':'—'}</td></tr><tr><td>Surplus buffer</td><td class="num">${fmt(S.surplus)}</td></tr><tr><td>PSM USDT</td><td class="num">${fmt(S.psm)}</td></tr><tr><td>Perp fees (all-time)</td><td class="num">${fmt(S.perpFees)}</td></tr></tbody></table>
+   <h3 style="margin-top:18px">Liquidations</h3><table><tbody>${S.liqs.slice(0,8).map(l=>`<tr><td>${l.w}</td><td>${l.sym}</td><td style="font-size:11px;color:var(--mut)">${l.mode}</td><td class="num">${fmt(l.debt,0)}</td></tr>`).join('')||'<tr><td colspan=4 style="color:var(--mut)">none yet</td></tr>'}</tbody></table></div></aside></div>`;
+}
+/* ---------- DIVIDENDS ---------- */
+function vDiv(){const me=S.me;const d=S.div;
+  return `<div class="two"><div>
+   <div class="statement" style="margin:0"><div class="head"><span>Dividend engine · every 15 minutes</span><b>epoch ${d.epoch} · next in ${cd(d.next-S.t)}</b></div>
+    <div class="stats"><div class="stat acc"><b>$${fmt(d.revenue)}</b><span>revenue accrued this epoch</span></div><div class="stat"><b>$${fmt(d.paid)}</b><span>stock airdropped all-time</span></div><div class="stat"><b>$${fmt(d.lp)}</b><span>locked LP all-time</span></div><div class="stat"><b>${S.users}</b><span>holders</span></div></div></div>
+   <p style="color:var(--ink2);max-width:700px;margin:18px 0">Every origination fee, stability fee, perp fee and liquidation fee lands in the revenue pot. At the top of each 15-minute epoch, <b>50% buys a tokenized stock at oracle price and is airdropped to $FOLIO holders pro-rata; 50% goes to locked FOLIO liquidity.</b> Rotation: NVDA → AAPL → GOOGL → HOOD → META → SPY.</p>
+   <table><thead><tr><th>Epoch</th><th>Time</th><th>Stock</th><th class="num">USD</th><th class="num">Shares</th><th class="num">@ price</th><th class="num">Holders</th><th class="num">→ LP</th></tr></thead><tbody>${d.history.map(h=>`<tr><td>${h.epoch}</td><td>${new Date(h.t).toISOString().slice(11,16)} UTC</td><td><b>${h.sym}</b></td><td class="num">$${fmt(h.usd)}</td><td class="num">${fmt(h.shares,5)}</td><td class="num">$${fpx(h.px)}</td><td class="num">${h.holders}</td><td class="num">$${fmt(h.lp)}</td></tr>`).join('')||'<tr><td colspan=8 style="color:var(--mut)">first epoch pays at the next quarter-hour</td></tr>'}</tbody></table>
+  </div><aside><div class="panel"><span class="kicker">Your dividends</span><h3>Stock received</h3>
+   ${me?`<p style="font-size:12px;color:var(--mut)">holding ${fmt(me.folio,0)} $FOLIO ${S.folio.mint?'':'(allocation · on-chain balances read once FOLIO_MINT is set)'}</p><table><tbody>${Object.entries(me.divs).map(([s,n])=>`<tr><td><b>${s}</b></td><td class="num">${fmt(n,6)}</td><td class="num">$${fmt(n*(S.px[s]||0))}</td></tr>`).join('')||'<tr><td style="color:var(--mut)">nothing yet — hold through an epoch</td></tr>'}</tbody></table>`:'<p style="color:var(--mut)">Connect a wallet.</p>'}
+  </div></aside></div>`;
+}
+/* ---------- PERPS ---------- */
+function vPerps(){const me=S.me;const sel=F.pSym||'NVDA';const mk=S.perps.find(p=>p.sym===sel);const side=F.pSide||'long';const lev=+(F.pLev||5);const margin=val('pMargin')||+(F.pMargin||100);
+  const rows=S.perps.map(p=>`<tr onclick="F.pSym='${p.sym}';render()" style="cursor:pointer;${sel===p.sym?'background:rgba(184,147,61,.12)':''}"><td><b>${p.sym}</b></td><td class="num">$${fpx(p.px)}</td><td class="num">${p.maxLev}×</td><td class="num ${p.funding.rate>=0?'dn':'up'}">${(p.funding.rate*100).toFixed(4)}%</td><td class="num">${fmt(p.funding.longOI||0,0)}</td><td class="num">${fmt(p.funding.shortOI||0,0)}</td></tr>`).join('');
+  const liq=side==='long'?mk.px*(1-1/lev+0.005):mk.px*(1+1/lev-0.005);
+  return `<div class="two"><div><span class="kicker">Perpetuals · fUSD margin · pyth mark · hourly funding</span>
+   <table><thead><tr><th>Market</th><th class="num">Mark</th><th class="num">Max lev</th><th class="num">Funding / h</th><th class="num">Long OI</th><th class="num">Short OI</th></tr></thead><tbody>${rows}</tbody></table>
+   ${me&&me.positions.length?`<div style="margin-top:26px"><span class="kicker">Open positions</span><table><thead><tr><th>Market</th><th>Side</th><th class="num">Size</th><th class="num">Entry</th><th class="num">Mark</th><th class="num">Liq</th><th class="num">PnL</th><th class="num">ROE</th><th></th></tr></thead><tbody>${me.positions.map(p=>`<tr><td><b>${p.sym}</b> ${p.lev}×</td><td class="${p.side==='long'?'up':'dn'}">${p.side}</td><td class="num">${fmt(p.notional,0)}</td><td class="num">${fpx(p.entry)}</td><td class="num">${fpx(p.px)}</td><td class="num">${fpx(p.liqPx)}</td><td class="num ${p.pnl>=0?'up':'dn'}">${p.pnl>=0?'+':''}${fmt(p.pnl)}</td><td class="num ${p.roe>=0?'up':'dn'}">${(p.roe*100).toFixed(1)}%</td><td><button class="btn mini ghost" onclick="act('/api/perp/close',{id:'${p.id}'})">Close</button></td></tr>`).join('')}</tbody></table></div>`:''}
+  </div><aside><div class="panel"><span class="kicker">${sel} · max ${mk.maxLev}× · fee 0.06%</span><h3>${sel} <span style="font-weight:400">$${fpx(mk.px)}</span></h3>
+   <div class="seg" style="margin:10px 0"><button class="${side==='long'?'on long':''}" onclick="F.pSide='long';render()">Long</button><button class="${side==='short'?'on short':''}" onclick="F.pSide='short';render()">Short</button></div>
+   ${inp('pMargin','Margin · fUSD','100','wallet '+(me?fmt(me.bal.fUSD):'—')+' fUSD')}
+   <div class="field"><label>Leverage · ${lev}×</label><input type="range" min="1" max="${mk.maxLev}" step="1" value="${lev}" oninput="F.pLev=this.value;render()" style="font-size:12px;padding:0"><div class="hint">notional ${fmt(margin*lev,0)} fUSD · est. liq $${fpx(liq)} · maint 0.5%</div></div>
+   <button class="btn ${side==='long'?'':'acc'}" style="width:100%;background:${side==='long'?'var(--green)':'var(--red)'};border-color:${side==='long'?'var(--green)':'var(--red)'}" onclick="act('/api/perp/open',{sym:'${sel}',side:'${side}',margin:val('pMargin')||100,lev:${lev}})">${side==='long'?'Buy / Long':'Sell / Short'} ${sel}</button>
+   <p style="font-size:11px;color:var(--mut);margin-top:10px">Isolated margin. Funding hourly, longs pay shorts when long OI dominates. Fees flow to the dividend engine.</p></div></aside></div>`;
+}
+function vAct(){return `<span class="kicker">Protocol ledger</span><table><thead><tr><th>Time</th><th>Type</th><th>Detail</th><th>Wallet</th></tr></thead><tbody>${S.events.map(e=>`<tr><td>${new Date(e.t).toISOString().slice(11,19)}</td><td><span class="tag ${e.k==='dividend'?'acc':''}">${e.k}</span></td><td>${e.m}</td><td>${e.w||''}</td></tr>`).join('')}</tbody></table>`}
+renderWallet();load();setInterval(load,4000);
+</script></body></html>

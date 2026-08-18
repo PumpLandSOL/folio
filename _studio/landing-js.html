@@ -1,0 +1,19 @@
+<script>
+const fmt=(v,d=2)=>(+v||0).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});const fpx=v=>v>=1000?fmt(v,2):v>=1?fmt(v,v>=100?2:3):(+v).toFixed(6);
+const cd=ms=>{if(ms<=0)return'now';const s=Math.floor(ms/1e3);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};const $=id=>document.getElementById(id);
+async function go(){const S=await (await fetch('/api/state')).json();
+ $('tape').innerHTML=Object.entries(S.px).filter(([s])=>s!=='USDG').map(([s,v])=>`<span><b>${s}</b> $${fpx(v)}</span>`).join('');
+ $('asof').textContent=new Date(S.t).toISOString().slice(0,16).replace('T',' ')+' UTC';
+ $('kSupply').textContent=fmt(S.supply,0);$('kTvl').textContent='$'+fmt(S.tvl,0);$('kPsm').textContent='$'+fmt(S.psm,0);$('kColl').textContent='$'+fmt(S.tvl-S.psm,0);$('kBack').textContent=S.backing?fmt(S.backing*100,0)+'%':'—';
+ $('kDiv').textContent='$'+fmt(S.div.paid);$('kNext').textContent=cd(S.div.next-S.t);$('kOI').textContent='$'+fmt(S.perpOI,0);
+ $('mk').innerHTML=`<div class="two"><table><thead><tr><th>Collateral</th><th class="num">Oracle</th><th class="num">LTV</th><th class="num">Liq</th></tr></thead><tbody>${Object.entries(S.markets).map(([s,m])=>`<tr><td><b>${s}</b> <span class="tag">${m.tier}</span></td><td class="num">$${fpx(m.px)}</td><td class="num">${(m.ltv*100).toFixed(0)}%</td><td class="num">${(m.liq*100).toFixed(0)}%</td></tr>`).join('')}</tbody></table>
+ <table><thead><tr><th>Perp</th><th class="num">Mark</th><th class="num">Max lev</th></tr></thead><tbody>${S.perps.map(p=>`<tr><td><b>${p.sym}</b></td><td class="num">$${fpx(p.px)}</td><td class="num">${p.maxLev}×</td></tr>`).join('')}</tbody></table></div>`;
+ const H=window.__hist=window.__hist||{};S.perps.forEach(p=>{(H[p.sym]=H[p.sym]||[]).push(p.px);if(H[p.sym].length>40)H[p.sym].shift()});
+ const spark=a=>{if(!a||a.length<2)return'';const mn=Math.min(...a),mx=Math.max(...a),r=mx-mn||1;const pts=a.map((v,i)=>(i/(a.length-1)*80)+','+(20-(v-mn)/r*16-2)).join(' ');const c=a[a.length-1]>=a[0]?'#50d2c1':'#ef5350';return '<svg class="spark" viewBox="0 0 80 22" style="color:'+c+'"><polyline points="'+pts+'" fill="none" stroke="'+c+'" stroke-width="1.5"/></svg>'};
+ $('hlRows').innerHTML=S.perps.map(p=>{const a=H[p.sym],ch=a.length>1?(a[a.length-1]/a[0]-1)*100:0;return '<tr><td><b>'+p.sym+'</b>-PERP</td><td class="num">'+fpx(p.px)+'</td><td class="num '+(ch>=0?'up':'dn')+'">'+(ch>=0?'+':'')+ch.toFixed(3)+'%</td><td>'+spark(a)+'</td><td class="num '+(p.funding.rate>0?'dn':p.funding.rate<0?'up':'')+'">'+(p.funding.rate*100).toFixed(4)+'%</td><td class="num">'+fmt(p.funding.longOI||0,0)+'</td><td class="num">'+fmt(p.funding.shortOI||0,0)+'</td><td class="num">'+p.maxLev+'×</td></tr>'}).join('');
+ $('hlOI').textContent='open interest $'+fmt(S.perpOI,0)+' · '+S.perps.length+' markets';
+ $('hlStrip').innerHTML=S.perps.slice(0,8).map(p=>'<span><b>'+p.sym+'</b> '+fpx(p.px)+'</span>').join('');
+ const nv=S.perps.find(p=>p.sym==='NVDA');if(nv){$('tkPx').textContent=fpx(nv.px);$('tkLiq').textContent=fpx(nv.px*(1-1/10+0.005))}
+ if(S.folio.price)$('pxFolio').textContent='$FOLIO $'+fpx(S.folio.price)}
+go();setInterval(go,6000);
+</script>

@@ -1,0 +1,63 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Folio — docs</title><link rel="stylesheet" href="/folio.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23f8f6f2'/%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23b8933d' stroke-width='2'/%3E%3Ccircle cx='32' cy='30' r='11' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3Ccircle cx='19.5' cy='29' r='4.5' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3Ccircle cx='44.5' cy='29' r='4.5' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3C/svg%3E"></head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+<symbol id="zMonkey" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" stroke-dasharray="1.5 3"/><circle cx="32" cy="32" r="26.5"/>
+<circle cx="32" cy="29" r="11"/><circle cx="19.5" cy="28" r="4.2"/><circle cx="44.5" cy="28" r="4.2"/>
+<path d="M24 31c1.5-6 5-9 8-9s6.5 3 8 9c-1.5 4.5-4.5 7.5-8 7.5s-6.5-3-8-7.5z"/>
+<path d="M26.5 26.5c1-1 2.5-1.2 3.6-.6M33.9 25.9c1.1-.6 2.6-.4 3.6.6"/>
+<circle cx="28.4" cy="28.8" r=".9" fill="currentColor"/><circle cx="35.6" cy="28.8" r=".9" fill="currentColor"/>
+<path d="M31.2 33.2h1.6"/>
+<path d="M32 40c-8 0-14 4-14 10M32 40c8 0 14 4 14 10M43 47c4-1 7 1 8 5s-2 6-5 4"/>
+</symbol>
+<symbol id="zHorse" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" stroke-dasharray="1.5 3"/><circle cx="32" cy="32" r="26.5"/>
+<path d="M18 52c2-14 6-24 14-30l3-8 3 7c6 1 10 6 13 15c1 3 1 5-1 7c-2 1-5 0-7-2c-3-2-6-2-8 0c-4 3-8 9-9 11"/>
+<path d="M32 22c-3 2-5 5-6 9M35 21c-2 3-4 6-4 10M38 22c-2 3-3 6-3 9"/>
+<circle cx="43" cy="30" r="1" fill="currentColor"/><path d="M48 39c.6.4 1 1 1 1.6"/>
+<path d="M36 41c-2 1-4 3-5 5"/>
+</symbol></svg>
+<header class="top"><div class="wrap">
+ <a class="brand" href="/"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><b>Folio</b></a>
+ <nav><a href="/">Home</a><a href="/app">fUSD</a><a class="on" href="/docs">Docs</a><a href="/x" target="_blank" rel="noopener">𝕏</a><a class="btn acc mini" href="/app">Open app</a></nav>
+</div></header>
+<div class="wrap doc">
+ <h1 class="hero" style="font-size:52px">Docs.</h1>
+ <blockquote>FOLIO combines a stock-collateral stablecoin (Nest), tiered CDP markets with a stability pool (Arrow, Robinhood Chain) and a 15-minute stock-dividend engine (The Index, Robinhood Chain) — and adds perpetuals margined in the stablecoin.</blockquote>
+
+ <h2>1 · fUSD — minting</h2>
+ <p>Each collateral asset is an <b>isolated market</b> with its own LTV, liquidation threshold and debt cap. Deposit collateral, mint fUSD up to <code>collateral × price × LTV</code>. Positions are not cross-collateralized.</p>
+ <ul><li><b>Stability fee</b>: 3.00% APR, accrued continuously: <code>debt × 0.03 × Δt / year</code>. Repayments hit accrued fees first, then principal.</li>
+  <li><b>Origination</b>: 0.10% of minted amount, paid at mint.</li>
+  <li><b>Health factor</b>: <code>collateral value × liquidation threshold ÷ debt</code>. Below 1.0 the vault is liquidatable.</li></ul>
+ <table><thead><tr><th>Tier</th><th>Assets</th><th class="num">Max LTV</th><th class="num">Liq. threshold</th></tr></thead><tbody>
+  <tr><td>Stable</td><td>USDT</td><td class="num">90%</td><td class="num">95%</td></tr>
+  <tr><td>Crypto</td><td>BNB</td><td class="num">75%</td><td class="num">82%</td></tr>
+  <tr><td>ETF</td><td>SPY, GLD</td><td class="num">55%</td><td class="num">65%</td></tr>
+  <tr><td>Tier 1</td><td>HOOD, NVDA, AAPL, GOOGL, META</td><td class="num">55%</td><td class="num">65%</td></tr>
+  <tr><td>Tier 2</td><td>TSLA, COIN, MSTR</td><td class="num">40%</td><td class="num">52%</td></tr></tbody></table>
+
+ <h2>2 · Peg stability module</h2>
+ <p>USDT ⇄ fUSD at 1:1, zero fee, no debt created. fUSD → USDT redemption is available while the PSM holds idle USDT. Oracle: Pyth for every price; USDT pinned to $1.</p>
+
+ <h2>3 · sfUSD — staked fUSD</h2>
+ <p>A share token. Deposit fUSD, receive shares at the current price-per-share; the pool accretes toward a <b>6% APY target</b>, funded from borrower stability fees first and the surplus buffer second. Unstaking burns an exit fee equal to one day of target APR (≈0.016%).</p>
+
+ <h2>4 · Stability pool &amp; liquidations</h2>
+ <p>When a vault's health factor drops below 1.0 the <b>stability pool</b> burns fUSD equal to the debt and receives collateral valued at <code>oracle × (1 − 5%)</code>, credited pro-rata to depositors. Any remaining collateral returns to the vault owner. If the pool is too shallow the <b>surplus buffer</b> (accumulated fees) absorbs the shortfall.</p>
+
+ <h2>5 · Dividend engine (every 15 minutes)</h2>
+ <p>All protocol revenue — origination, stability, perp taker/liquidation fees — accrues to a pot. At each quarter-hour: <b>50%</b> buys a tokenized stock at oracle price and is airdropped to $FOLIO holders pro-rata to balance; <b>50%</b> is added to locked FOLIO liquidity. Stock rotation: NVDA → AAPL → GOOGL → HOOD → META → SPY. Holder balances are read on-chain once <code>FOLIO_MINT</code> is set; until then each connected wallet carries an allocation.</p>
+
+ <h2>6 · Perpetuals</h2>
+ <ul><li>Markets: BTC, ETH, BNB, SOL (max 25×); HOOD, NVDA, TSLA, SPY, COIN, MSTR, AAPL, GOOGL, META, GLD (max 10×).</li>
+  <li>Isolated margin in fUSD. Mark = Pyth. Taker fee 0.06% on open and close.</li>
+  <li>Maintenance margin 0.5% of notional; equity ≤ maintenance → liquidation, 0.5% liquidation fee.</li>
+  <li>Funding hourly: <code>rate = clamp(±0.1%, k × (longOI − shortOI)/(longOI + shortOI))</code>; the heavier side pays.</li>
+  <li>All perp fees flow to the dividend engine.</li></ul>
+
+ <h2>7 · $FOLIO</h2>
+ <p>The protocol token on BNB Chain. Holding it is what earns the 15-minute stock dividends. Nothing here is financial advice; overcollateralized lending and leveraged trading can lose money.</p>
+</div>
+<footer><div class="gold-rule"></div><div class="wrap"><span class="seals"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg></span><span>Folio · $FOLIO · BNB Chain</span><span>fUSD · sfUSD · dividends · perps</span></div></footer>
+</body></html>
