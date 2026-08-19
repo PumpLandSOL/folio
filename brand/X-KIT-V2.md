@@ -46,3 +46,32 @@ fUSD, backed by stocks. Hold $FOLIO → up to 3× yield, 15-min stock dividends,
 
 ## Disclaimer to pin/reply
 Not financial advice. Overcollateralized lending, leveraged trading and locked deposits can lose money. Buyback allocations are executed from the treasury at market.
+
+## Tech explainer tweets (with graphics)
+
+### T1 · folio-tech-flywheel.png
+Most protocols have one yield source. Folio has one revenue pot and four engines.
+
+Every fee — mint, borrow, trade, liquidate — hits the pot. Every 15 min it splits: 40% buys real stock for $FOLIO holders, 30% locks LP, 30% burns $FOLIO.
+
+Then holding $FOLIO multiplies sfUSD, locks and points up to 3×.
+
+More activity → bigger pot → more stock out, more supply gone → holding pays more → more activity. That's the loop.
+
+### T2 · folio-tech-boost.png
+Here's the part nobody else does.
+
+Your $FOLIO balance is read live from BNB Chain — no staking, no snapshot, no lock. It sets a tier: Bronze 1.5× · Silver 2× · Gold 2.5× · Diamond 3×.
+
+That multiplier hits everything: sfUSD 6% → 18%, 365d locks 50% → 150%, Season points ×3.
+
+Every stable pays everyone the same rate. Folio pays the token holders the most. Demand for $FOLIO is written into the yield curve.
+
+### T3 · folio-tech-burn.png
+V1 split revenue 50/50 — stock airdrop / LP. Zero supply pressure.
+
+V2: 40 / 30 / 30. That last 30% buys back and burns $FOLIO — every 15 minutes, 96× a day, forever. Early lock exits burn 10% on top.
+
+Same fee pays holders in NVDA and shrinks the float in the same epoch. Demand up, supply down, from one transaction.
+
+Live burn ledger on the Dividends tab. foliobnb.xyz/app
