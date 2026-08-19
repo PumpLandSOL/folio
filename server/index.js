@@ -7,6 +7,8 @@ const PORT = +process.env.PORT || 8188;
 const ROOT = path.join(__dirname, '..');
 const DATA_PATH = process.env.DATA_PATH || path.join(ROOT, 'data.json');
 const FOLIO_MINT = process.env.FOLIO_MINT || '0x2c4e63ead1936ba1fe963fa3cb918a7b34de7777';
+const TREASURY = (process.env.TREASURY || '0x3a0Ef3B70531Ae579810644CF287F82fD9BB9c8F').toLowerCase();
+const TOKENS = { USDT: { addr: '0x55d398326f99059ff775485246999027b3197955', dec: 18 } };  // BSC-USDT (18 dp)
 const now = () => Date.now();
 const isWallet = (s) => /^0x[a-fA-F0-9]{40}$/.test(s || '');
 const short = (w) => (w || '').slice(0, 6) + '…' + (w || '').slice(-4);
@@ -21,10 +23,22 @@ const P = {
   STAKE_EXIT_FEE: 0.06 / 365,   // one day of target APR, burned
   LIQ_DISCOUNT: 0.05,           // stability pool buys collateral 5% under oracle
   DIVIDEND_EPOCH: 15 * 60e3,    // The Index cadence
-  DIVIDEND_SPLIT: 0.5,          // 50% stock airdrop / 50% locked LP
+  DIVIDEND_SPLIT: 0.4,          // 40% stock airdrop / 30% locked LP / 30% buyback&burn (V2)
   PERP_TAKER_FEE: 0.0006, PERP_MAINT: 0.005, PERP_LIQ_FEE: 0.005,
   FUNDING_INTERVAL: 3600e3, FUNDING_K: 0.0001,
   START_FOLIO: 10000,           // paper $FOLIO allocation per wallet until FOLIO_MINT set
+  // ---- V2 · The Compounding Update ----
+  BUYBACK_SPLIT: 0.30,          // 30% of every epoch's revenue -> $FOLIO buyback & burn (stock 40% / LP 30% / burn 30%)
+  LOCK_TERMS: { 30: 0.12, 90: 0.20, 180: 0.30, 365: 0.50 },   // days -> base APY on term-locked fUSD
+  LOCK_EARLY_PENALTY: 0.10,     // early exit: 10% of principal burned
+  BOOST_TIERS: [                // real on-chain $FOLIO holdings (share of supply) -> sfUSD/lock APY multiplier + points multiplier
+    { name: 'Paper',   share: 0,       mult: 1.0 }, { name: 'Bronze',  share: 0.0001,  mult: 1.5 },
+    { name: 'Silver',  share: 0.001,   mult: 2.0 }, { name: 'Gold',    share: 0.005,   mult: 2.5 }, { name: 'Diamond', share: 0.01, mult: 3.0 } ],
+  BOOST_ABS: [0, 10000, 100000, 500000, 1000000],   // absolute $FOLIO fallback thresholds when supply unknown
+  SEASON_POOL_SHARE: 0.05,      // Season 1 airdrop pool = 5% of $FOLIO supply
+  SEASON_END: Date.UTC(2026, 10, 1),   // Season 1 ends 2026-11-01
+  PTS: { stake: 1, lock: 3, sp: 2, debt: 1.5, trade: 0.5, dividend: 0.25 },  // points per $ per day (trade: per $100 notional)
+  REF_BONUS: 0.10, STREAK_STEP: 0.05, STREAK_MAX: 0.50,
 };
 
 // ---------- oracle ----------
@@ -85,6 +99,35 @@ async function refreshHolders() {  // every connected wallet is re-read on-chain
   CHAIN.checked = n; CHAIN.lastRead = now();
 }
 
+// ---------- treasury deposits: real BNB / USDT sent to TREASURY, verified on-chain, credited to ledger ----------
+const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+async function creditDeposit(w, txHash) {
+  if (!/^0x[a-fA-F0-9]{64}$/.test(txHash || '')) throw 'bad tx hash'; txHash = txHash.toLowerCase();
+  db.txs = db.txs || {}; if (db.txs[txHash]) throw 'already credited';
+  const [tx, rc] = await Promise.all([rpc('eth_getTransactionByHash', [txHash]), rpc('eth_getTransactionReceipt', [txHash])]);
+  if (!tx) throw 'tx not found'; if (!rc) throw 'pending — try again in a few seconds'; if (rc.status !== '0x1') throw 'tx reverted';
+  if ((tx.from || '').toLowerCase() !== w) throw 'tx not from your wallet';
+  let sym, amt;
+  if ((tx.to || '').toLowerCase() === TREASURY && BigInt(tx.value || '0x0') > 0n) { sym = 'BNB'; amt = hexToNum(tx.value, 18); }
+  else {
+    for (const lg of rc.logs || []) {
+      const t = Object.entries(TOKENS).find(([, v]) => v.addr === (lg.address || '').toLowerCase()); if (!t || lg.topics[0] !== TRANSFER_TOPIC) continue;
+      const from = '0x' + lg.topics[1].slice(26), to = '0x' + lg.topics[2].slice(26);
+      if (from.toLowerCase() === w && to.toLowerCase() === TREASURY) { sym = t[0]; amt = hexToNum(lg.data, t[1].dec); break; }
+    }
+  }
+  if (!sym || !(amt > 0)) throw 'no transfer to treasury found in this tx';
+  const u = user(w); add(u, sym, amt); u.deposited = u.deposited || {}; u.deposited[sym] = (u.deposited[sym] || 0) + amt;
+  db.txs[txHash] = { w, sym, amt, block: Number(BigInt(rc.blockNumber)), t: now() }; db.treasury = db.treasury || {}; db.treasury[sym] = (db.treasury[sym] || 0) + amt;
+  ev('treasury', amt + ' ' + sym + ' deposited to treasury · ' + txHash.slice(0, 10) + '…', w); save();
+  return { sym, amt, block: db.txs[txHash].block, tx: txHash };
+}
+async function treasuryBalances() {
+  try { const bnb = hexToNum(await rpc('eth_getBalance', [TREASURY, 'latest']), 18);
+    const usdt = hexToNum(await rpc('eth_call', [{ to: TOKENS.USDT.addr, data: '0x70a08231' + TREASURY.slice(2).padStart(64, '0') }, 'latest']), 18);
+    const folio = FOLIO_MINT ? await chainBalance(TREASURY) : 0; CHAIN.treasury = { BNB: bnb, USDT: usdt, FOLIO: folio, t: now() }; } catch (e) {}
+}
+
 // ---------- collateral markets (Arrow tiers) ----------
 const MARKETS = {
   USDT:  { tier: 'Stable',   ltv: 0.90, liq: 0.95, cap: 5e6 },
@@ -109,7 +152,8 @@ let db = { users: {}, vaults: {}, positions: {}, seq: 1,
   stake: { pool: 0, shares: 0, accrued: 0 },                       // sfUSD: fUSD pool + shares
   sp: { pool: 0, shares: 0, gains: {} },                           // stability pool: fUSD + collateral gains
   div: { revenue: 0, epoch: 0, lp: 0, paid: 0, history: [] },      // dividend engine
-  funding: {}, liqs: [], perpFees: 0, events: [] };
+  funding: {}, liqs: [], perpFees: 0, events: [],
+  locks: {}, burn: { fusd: 0, folio: 0, epochs: 0 }, season: { n: 1, total: 0, refs: 0 } };
 try { db = Object.assign(db, JSON.parse(fs.readFileSync(DATA_PATH, 'utf8'))); } catch (e) {}
 let DIRTY = false; const save = () => { DIRTY = true; };
 setInterval(() => { if (DIRTY) { DIRTY = false; try { fs.writeFileSync(DATA_PATH, JSON.stringify(db)); } catch (e) {} } }, 2500);
@@ -117,7 +161,7 @@ const ev = (k, m, w) => { db.events.unshift({ t: now(), k, m, w: w ? short(w) : 
 
 function user(w) {
   w = w.toLowerCase();
-  if (!db.users[w]) { db.users[w] = { wallet: w, bal: { ...STARTER, fUSD: 0 }, folio: CHAIN.ok ? 0 : P.START_FOLIO, sShares: 0, spShares: 0, divs: {}, pnl: 0, t: now() }; ev('join', short(w) + ' joined'); save(); if (CHAIN.ok) chainBalance(w).then((b) => { db.users[w].folio = b; CHAIN.holders[w] = { bal: b, t: now() }; save(); }).catch(() => {}); }
+  if (!db.users[w]) { db.users[w] = { wallet: w, bal: { ...STARTER, fUSD: 0 }, folio: CHAIN.ok ? 0 : P.START_FOLIO, sShares: 0, spShares: 0, divs: {}, pnl: 0, t: now(), pts: 0, ptsBreak: {}, ref: null, refPts: 0, streak: 0, lastCheck: 0, tradeVol: 0 }; ev('join', short(w) + ' joined'); save(); if (CHAIN.ok) chainBalance(w).then((b) => { db.users[w].folio = b; CHAIN.holders[w] = { bal: b, t: now() }; save(); }).catch(() => {}); }
   return db.users[w];
 }
 const bal = (u, s) => u.bal[s] || 0;
@@ -193,6 +237,64 @@ function spWithdraw(w, sh) { const u = user(w); sh = Math.min(+sh, u.spShares); 
   for (const s of Object.keys(db.sp.gains)) { const g = db.sp.gains[s] * frac; db.sp.gains[s] -= g; add(u, s, g); }
   u.spShares -= sh; db.sp.shares -= sh; db.sp.pool -= val; add(u, 'fUSD', val); ev('sp', `withdrew ${val.toFixed(2)} fUSD + collateral gains`, u.wallet); save(); }
 
+
+// ---------- V2 · holder boost ----------
+function boostOf(u) {
+  const T = P.BOOST_TIERS; let tier = T[0], i = 0;
+  if (CHAIN.ok && CHAIN.supply > 0) { const sh = (u.folio || 0) / CHAIN.supply; for (let k = 0; k < T.length; k++) if (sh >= T[k].share) { tier = T[k]; i = k; } }
+  else { for (let k = 0; k < T.length; k++) if ((u.folio || 0) >= P.BOOST_ABS[k]) { tier = T[k]; i = k; } }
+  const next = T[i + 1] || null;
+  return { name: tier.name, mult: tier.mult, idx: i, next: next ? { name: next.name, mult: next.mult, need: CHAIN.ok && CHAIN.supply > 0 ? next.share * CHAIN.supply : P.BOOST_ABS[i + 1] } : null, apy: P.STAKE_TARGET_APY * tier.mult };
+}
+// sfUSD is a share token, so a staker's boost above 1x is credited as extra sfUSD shares minted to them each tick (pool grows by the same fUSD, funded from surplus).
+function boostAccrue(dt) {
+  for (const u of Object.values(db.users)) {
+    if (!(u.sShares > 0)) continue; const b = boostOf(u); if (b.mult <= 1) continue;
+    const val = u.sShares * stakePPS(); const extra = val * P.STAKE_TARGET_APY * (b.mult - 1) * dt / YEAR; if (!(extra > 0)) continue;
+    const sh = extra / stakePPS(); u.sShares += sh; db.stake.shares += sh; db.stake.pool += extra; db.supply += extra; db.surplus -= extra; u.boostEarned = (u.boostEarned || 0) + extra;
+  }
+}
+// ---------- V2 · term locks ----------
+function lock(w, amt, days) {
+  const u = user(w); amt = +amt; days = +days; if (!(amt >= 10)) throw 'min 10 fUSD'; if (!P.LOCK_TERMS[days]) throw 'term must be 30 / 90 / 180 / 365 days';
+  if (bal(u, 'fUSD') < amt) throw 'insufficient fUSD'; add(u, 'fUSD', -amt);
+  const id = 'L' + (db.seq++); db.locks[id] = { id, wallet: u.wallet, amt, days, apy: P.LOCK_TERMS[days], t: now(), until: now() + days * 86400e3, earned: 0, last: now() };
+  ev('lock', `${amt.toFixed(2)} fUSD locked ${days}d @ ${(P.LOCK_TERMS[days] * 100).toFixed(0)}% base`, u.wallet); save(); return db.locks[id];
+}
+function unlock(w, id) {
+  const L = db.locks[id]; if (!L || L.wallet !== w.toLowerCase()) throw 'no such lock'; const u = user(w); lockAccrue();
+  const early = now() < L.until; const pen = early ? L.amt * P.LOCK_EARLY_PENALTY : 0; const out = L.amt + L.earned - pen;
+  if (pen > 0) { db.supply -= pen; db.burn.fusd += pen; }   // penalty burned
+  add(u, 'fUSD', out); delete db.locks[id]; ev('unlock', `${early ? 'EARLY exit · ' + pen.toFixed(2) + ' fUSD burned · ' : ''}${out.toFixed(2)} fUSD released`, u.wallet); save(); return { out, pen, early };
+}
+function lockAccrue() {
+  const t = now();
+  for (const L of Object.values(db.locks)) { const from = L.last, to = Math.min(t, L.until); L.last = t; if (to <= from) continue;
+    const u = db.users[L.wallet]; const m = u ? boostOf(u).mult : 1; const y = L.amt * L.apy * m * (to - from) / YEAR; if (y > 0) { L.earned += y; db.supply += y; db.surplus -= y; } }
+}
+const lockView = (L) => { const u = db.users[L.wallet]; const m = u ? boostOf(u).mult : 1; return { ...L, boosted: L.apy * m, matured: now() >= L.until, value: L.amt + L.earned }; };
+// ---------- V2 · Season points ----------
+function ptsAdd(u, k, x) { if (!(x > 0)) return; const b = boostOf(u).mult; const st = 1 + Math.min(P.STREAK_MAX, (u.streak || 0) * P.STREAK_STEP); const v = x * b * st; u.pts = (u.pts || 0) + v; u.ptsBreak = u.ptsBreak || {}; u.ptsBreak[k] = (u.ptsBreak[k] || 0) + v; db.season.total += v;
+  if (u.ref && db.users[u.ref]) { const r = db.users[u.ref]; const rv = v * P.REF_BONUS; r.pts = (r.pts || 0) + rv; r.refPts = (r.refPts || 0) + rv; r.ptsBreak = r.ptsBreak || {}; r.ptsBreak.referral = (r.ptsBreak.referral || 0) + rv; db.season.total += rv; } }
+function pointsAccrue(dt) {
+  if (now() > P.SEASON_END) return; const d = dt / 86400e3;
+  const locksBy = {}; for (const L of Object.values(db.locks)) locksBy[L.wallet] = (locksBy[L.wallet] || 0) + L.amt * (L.days >= 365 ? 2 : L.days >= 180 ? 1.6 : L.days >= 90 ? 1.3 : 1);
+  const debtBy = {}; for (const v of Object.values(db.vaults)) debtBy[v.wallet] = (debtBy[v.wallet] || 0) + v.debt;
+  for (const u of Object.values(db.users)) {
+    ptsAdd(u, 'stake', u.sShares * stakePPS() * P.PTS.stake * d); ptsAdd(u, 'lock', (locksBy[u.wallet] || 0) * P.PTS.lock * d);
+    ptsAdd(u, 'stability', (db.sp.shares > 0 ? db.sp.pool * u.spShares / db.sp.shares : 0) * P.PTS.sp * d); ptsAdd(u, 'borrow', (debtBy[u.wallet] || 0) * P.PTS.debt * d);
+  }
+}
+function checkin(w) { const u = user(w); const day = Math.floor(now() / 86400e3), last = Math.floor((u.lastCheck || 0) / 86400e3); if (day === last) throw 'already checked in today'; u.streak = day - last === 1 ? (u.streak || 0) + 1 : 1; u.lastCheck = now(); ptsAdd(u, 'checkin', 10); ev('checkin', `day ${u.streak} streak`, u.wallet); save(); return u.streak; }
+function setRef(w, r) { const u = user(w); r = (r || '').toLowerCase(); if (!isWallet(r) || r === u.wallet) throw 'bad referrer'; if (u.ref) throw 'referrer already set'; user(r); u.ref = r; db.season.refs++; ptsAdd(u, 'referral', 50); ev('referral', `${short(u.wallet)} referred by ${short(r)}`); save(); }
+function seasonView(u) {
+  const users = Object.values(db.users).filter((x) => x.pts > 0).sort((a, b) => b.pts - a.pts); const pool = (CHAIN.ok ? CHAIN.supply : 1e9) * P.SEASON_POOL_SHARE;
+  const rank = u ? users.findIndex((x) => x.wallet === u.wallet) + 1 : 0;
+  return { n: db.season.n, end: P.SEASON_END, total: db.season.total, pool, refs: db.season.refs, players: users.length,
+    board: users.slice(0, 20).map((x, i) => ({ rank: i + 1, w: short(x.wallet), pts: x.pts, tier: boostOf(x).name, est: db.season.total > 0 ? pool * x.pts / db.season.total : 0 })),
+    me: u ? { pts: u.pts || 0, rank, share: db.season.total > 0 ? (u.pts || 0) / db.season.total : 0, est: db.season.total > 0 ? pool * (u.pts || 0) / db.season.total : 0, breakdown: u.ptsBreak || {}, streak: u.streak || 0, canCheck: Math.floor(now() / 86400e3) !== Math.floor((u.lastCheck || 0) / 86400e3), ref: u.ref, refPts: u.refPts || 0 } : null };
+}
+
 // ---------- dividend engine (The Index) ----------
 const STOCK_ROTATION = ['NVDA', 'AAPL', 'GOOGL', 'HOOD', 'META', 'SPY'];
 function revenue(x) { if (x > 0) db.div.revenue += x; }
@@ -200,13 +302,15 @@ function dividendTick() {
   const t = now(); if (!db.div.next) db.div.next = Math.ceil(t / P.DIVIDEND_EPOCH) * P.DIVIDEND_EPOCH; if (t < db.div.next) return;
   db.div.next += P.DIVIDEND_EPOCH; db.div.epoch++;
   const pot = db.div.revenue; db.div.revenue = 0; if (pot <= 0) { save(); return; }
-  const toLP = pot * (1 - P.DIVIDEND_SPLIT), toStock = pot * P.DIVIDEND_SPLIT; db.div.lp += toLP;
+  const toBurn = pot * P.BUYBACK_SPLIT, toLP = pot * (1 - P.DIVIDEND_SPLIT - P.BUYBACK_SPLIT), toStock = pot * P.DIVIDEND_SPLIT; db.div.lp += toLP;
+  db.burn.fusd += toBurn; if (FOLIO_PRICE > 0) db.burn.folio += toBurn / FOLIO_PRICE; db.burn.epochs++; db.supply -= toBurn;
   const sym = STOCK_ROTATION[db.div.epoch % STOCK_ROTATION.length]; const px = PX[sym] || 0; if (!(px > 0)) { db.div.revenue += pot; return; }
   const shares = toStock / px; const holders = Object.values(db.users).filter((u) => u.folio > 0); const tot = holders.reduce((a, u) => a + u.folio, 0);
   for (const u of holders) { const s = shares * u.folio / tot; add(u, sym, s); u.divs[sym] = (u.divs[sym] || 0) + s; }
-  db.div.paid += toStock; const rec = { t, epoch: db.div.epoch, sym, usd: toStock, shares, px, holders: holders.length, lp: toLP, block: CHAIN.block, weight: tot, onchain: CHAIN.ok };
+  db.div.paid += toStock; for (const u of holders) ptsAdd(u, 'dividend', toStock * u.folio / tot * P.PTS.dividend * 100);
+  const rec = { t, epoch: db.div.epoch, sym, usd: toStock, shares, px, holders: holders.length, lp: toLP, burn: toBurn, block: CHAIN.block, weight: tot, onchain: CHAIN.ok };
   rec.receipt = crypto.createHash('sha256').update(JSON.stringify(rec)).digest('hex'); db.div.history.unshift(rec); if (db.div.history.length > 96) db.div.history.pop();
-  ev('dividend', `epoch ${db.div.epoch}: $${toStock.toFixed(2)} of ${sym} airdropped to ${holders.length} holders · $${toLP.toFixed(2)} → locked LP`); save();
+  ev('dividend', `epoch ${db.div.epoch}: ${toStock.toFixed(2)} of ${sym} airdropped to ${holders.length} holders · ${toLP.toFixed(2)} → LP · ${toBurn.toFixed(2)} → $FOLIO buyback & burn`); save();
 }
 
 // ---------- perps ----------
@@ -217,7 +321,7 @@ function openPerp(w, sym, side, margin, lev) {
   if (bal(u, 'fUSD') < margin) throw 'insufficient fUSD'; const px = PX[sym]; if (!(px > 0)) throw 'no price';
   const notional = margin * lev, fee = notional * P.PERP_TAKER_FEE; add(u, 'fUSD', -margin); db.perpFees += fee; db.surplus += fee; revenue(fee);
   const p = { id: 'p' + (db.seq++), wallet: u.wallet, sym, side, size: (notional - fee) / px, entry: px, margin: margin - fee, lev, t: now(), fundingPaid: 0 };
-  db.positions[p.id] = p; ev('perp', `${side} ${sym} ${lev}× · ${notional.toFixed(0)} fUSD`, u.wallet); save(); return posView(p);
+  db.positions[p.id] = p; u.tradeVol = (u.tradeVol || 0) + notional; ptsAdd(u, 'trade', notional / 100 * P.PTS.trade); ev('perp', `${side} ${sym} ${lev}× · ${notional.toFixed(0)} fUSD`, u.wallet); save(); return posView(p);
 }
 function closePerp(w, id, reason) {
   const p = pos(id); if (!p || p.wallet !== w.toLowerCase()) throw 'no such position'; const v = posView(p); const u = user(w); const px = PX[p.sym];
@@ -249,15 +353,16 @@ function protocolView() {
   const byMkt = {}; for (const s of Object.keys(MARKETS)) byMkt[s] = { ...MARKETS[s], px: PX[s] || 0, coll: 0, debt: 0 }; for (const v of vaults) { byMkt[v.sym].coll += v.coll; byMkt[v.sym].debt += v.debt; }
   const perpOI = Object.values(db.positions).reduce((a, p) => a + p.size * (PX[p.sym] || 0), 0);
   return { t: now(), ok: PRICE_OK, px: PX, params: P, markets: byMkt, perps: Object.keys(PERPS).map((s) => ({ sym: s, px: PX[s] || 0, maxLev: PERPS[s], funding: db.funding[s] || { rate: 0, longOI: 0, shortOI: 0 } })),
-    supply: db.supply, tvl, backing: db.supply > 0 ? tvl / db.supply : 0, psm: db.psmUSDT, surplus: db.surplus, stake: { pool: db.stake.pool, pps: stakePPS(), apy: P.STAKE_TARGET_APY }, sp: { pool: db.sp.pool, gains: db.sp.gains },
-    div: { ...db.div, next: db.div.next || 0, revenue: db.div.revenue }, perpOI, perpFees: db.perpFees, liqs: db.liqs.slice(0, 20), events: db.events.slice(0, 40), users: Object.keys(db.users).length, folio: { mint: FOLIO_MINT, price: FOLIO_PRICE, chain: { ok: CHAIN.ok, supply: CHAIN.supply, symbol: CHAIN.symbol, block: CHAIN.block, rpc: CHAIN.rpc, holdersRead: CHAIN.checked, lastRead: CHAIN.lastRead, decimals: CHAIN.decimals } } };
+    supply: db.supply, tvl, backing: db.supply > 0 ? tvl / db.supply : 0, psm: db.psmUSDT, surplus: db.surplus, stake: { pool: db.stake.pool, pps: stakePPS(), apy: P.STAKE_TARGET_APY, maxApy: P.STAKE_TARGET_APY * P.BOOST_TIERS[P.BOOST_TIERS.length - 1].mult }, locks: { terms: P.LOCK_TERMS, tvl: Object.values(db.locks).reduce((a, L) => a + L.amt, 0), n: Object.keys(db.locks).length, penalty: P.LOCK_EARLY_PENALTY }, burn: db.burn, tiers: P.BOOST_TIERS, season: seasonView(null), sp: { pool: db.sp.pool, gains: db.sp.gains },
+    div: { ...db.div, next: db.div.next || 0, revenue: db.div.revenue }, perpOI, perpFees: db.perpFees, liqs: db.liqs.slice(0, 20), events: db.events.slice(0, 40), users: Object.keys(db.users).length, treasury: { addr: TREASURY, onchain: CHAIN.treasury || null, credited: db.treasury || {}, tokens: { USDT: TOKENS.USDT.addr } }, folio: { mint: FOLIO_MINT, price: FOLIO_PRICE, chain: { ok: CHAIN.ok, supply: CHAIN.supply, symbol: CHAIN.symbol, block: CHAIN.block, rpc: CHAIN.rpc, holdersRead: CHAIN.checked, lastRead: CHAIN.lastRead, decimals: CHAIN.decimals } } };
 }
 function meView(w) {
   const u = user(w); const vaults = Object.values(db.vaults).filter((v) => v.wallet === u.wallet).map((v) => { accrue(v); return vaultView(v); });
   const positions = Object.values(db.positions).filter((p) => p.wallet === u.wallet).map(posView);
   const sfusd = u.sShares * stakePPS(); const spVal = db.sp.shares > 0 ? db.sp.pool * u.spShares / db.sp.shares : 0;
-  const nav = Object.entries(u.bal).reduce((a, [s, v]) => a + v * (s === 'fUSD' ? 1 : (PX[s] || 0)), 0) + vaults.reduce((a, v) => a + v.collValue - v.debt, 0) + sfusd + spVal + positions.reduce((a, p) => a + p.eq, 0);
-  return { wallet: u.wallet, bal: u.bal, folio: u.folio, folioShare: CHAIN.supply > 0 ? u.folio / CHAIN.supply : 0, onchain: CHAIN.ok && !!CHAIN.holders[u.wallet], vaults, positions, sfusd, sShares: u.sShares, spVal, spShares: u.spShares, divs: u.divs, pnl: u.pnl, nav };
+  const locks = Object.values(db.locks).filter((L) => L.wallet === u.wallet).map(lockView);
+  const nav = Object.entries(u.bal).reduce((a, [s, v]) => a + v * (s === 'fUSD' ? 1 : (PX[s] || 0)), 0) + vaults.reduce((a, v) => a + v.collValue - v.debt, 0) + sfusd + spVal + positions.reduce((a, p) => a + p.eq, 0) + locks.reduce((a, L) => a + L.value, 0);
+  return { wallet: u.wallet, bal: u.bal, boost: boostOf(u), locks, lockVal: locks.reduce((a, L) => a + L.value, 0), boostEarned: u.boostEarned || 0, season: seasonView(u).me, deposited: u.deposited || {}, folio: u.folio, folioShare: CHAIN.supply > 0 ? u.folio / CHAIN.supply : 0, onchain: CHAIN.ok && !!CHAIN.holders[u.wallet], vaults, positions, sfusd, sShares: u.sShares, spVal, spShares: u.spShares, divs: u.divs, pnl: u.pnl, nav };
 }
 
 // ---------- http ----------
@@ -269,6 +374,7 @@ http.createServer(async (req, res) => {
   try {
     if (p === '/api/state') { const w = (url.searchParams.get('w') || '').toLowerCase(); return json(res, 200, { ...protocolView(), me: isWallet(w) ? meView(w) : null }); }
     if (p === '/api/holder') { const w = (url.searchParams.get('w') || '').toLowerCase(); if (!isWallet(w)) return json(res, 200, { error: 'wallet' }); try { const bal = await chainBalance(w); const u = db.users[w]; if (u) { u.folio = bal; save(); } CHAIN.holders[w] = { bal, t: now() }; return json(res, 200, { wallet: w, folio: bal, share: CHAIN.supply > 0 ? bal / CHAIN.supply : 0, block: CHAIN.block, rpc: CHAIN.rpc, mint: FOLIO_MINT }); } catch (e) { return json(res, 200, { error: 'chain read failed' }); } }
+    if (p === '/api/season') { const w = (url.searchParams.get('w') || '').toLowerCase(); return json(res, 200, seasonView(isWallet(w) ? user(w) : null)); }
     if (p === '/api/dividends') return json(res, 200, { mint: FOLIO_MINT, chain: CHAIN.ok, epoch: db.div.epoch, next: db.div.next, paid: db.div.paid, lp: db.div.lp, history: db.div.history });
     if (p === '/x') { res.writeHead(302, { location: 'https://x.com/FolioBNB' }); return res.end(); }
     if (req.method === 'POST' && p.startsWith('/api/')) {
@@ -276,6 +382,7 @@ http.createServer(async (req, res) => {
       let r = null;
       switch (p) {
         case '/api/deposit': r = deposit(w, d.sym, d.amount); break;
+        case '/api/treasury/credit': r = await creditDeposit(w, d.tx); break;
         case '/api/mint': r = mint(w, d.sym, d.amount); break;
         case '/api/repay': r = repay(w, d.sym, d.amount); break;
         case '/api/withdraw': r = withdraw(w, d.sym, d.amount); break;
@@ -286,6 +393,10 @@ http.createServer(async (req, res) => {
         case '/api/sp/withdraw': spWithdraw(w, d.shares); break;
         case '/api/perp/open': r = openPerp(w, d.sym, d.side, d.margin, d.lev); break;
         case '/api/perp/close': r = closePerp(w, d.id); break;
+        case '/api/lock': r = lock(w, d.amount, d.days); break;
+        case '/api/unlock': r = unlock(w, d.id); break;
+        case '/api/checkin': r = checkin(w); break;
+        case '/api/ref': setRef(w, d.ref); break;
         default: return json(res, 404, { error: 'unknown' });
       }
       return json(res, 200, { ok: true, r, me: meView(w) });
@@ -297,5 +408,6 @@ http.createServer(async (req, res) => {
 }).listen(PORT, () => console.log('FOLIO · fUSD + stock dividends + perps · :' + PORT));
 
 pollPyth(); pollFolio(); setInterval(pollPyth, 5000); setInterval(pollFolio, 60000);
-chainMeta().then(refreshHolders); setInterval(chainMeta, 60000); setInterval(refreshHolders, 120000);
-setInterval(() => { if (!PRICE_OK) return; liquidations(); perpTick(); stakeAccrue(); dividendTick(); }, 3000);
+chainMeta().then(refreshHolders).then(treasuryBalances); setInterval(treasuryBalances, 60000); setInterval(chainMeta, 60000); setInterval(refreshHolders, 120000);
+let LAST_TICK = now();
+setInterval(() => { if (!PRICE_OK) return; const dt = now() - LAST_TICK; LAST_TICK = now(); liquidations(); perpTick(); stakeAccrue(); boostAccrue(dt); lockAccrue(); pointsAccrue(dt); dividendTick(); save(); }, 3000);

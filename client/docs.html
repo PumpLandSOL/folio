@@ -47,7 +47,7 @@
  <p>When a vault's health factor drops below 1.0 the <b>stability pool</b> burns fUSD equal to the debt and receives collateral valued at <code>oracle × (1 − 5%)</code>, credited pro-rata to depositors. Any remaining collateral returns to the vault owner. If the pool is too shallow the <b>surplus buffer</b> (accumulated fees) absorbs the shortfall.</p>
 
  <h2>5 · Dividend engine (every 15 minutes)</h2>
- <p>All protocol revenue — origination, stability, perp taker/liquidation fees — accrues to a pot. At each quarter-hour: <b>50%</b> buys a tokenized stock at oracle price and is airdropped to $FOLIO holders pro-rata to balance; <b>50%</b> is added to locked FOLIO liquidity. Stock rotation: NVDA → AAPL → GOOGL → HOOD → META → SPY. Holder weight is the <b>real $FOLIO balance read on BNB Chain</b> (ERC-20 <code>balanceOf</code>, public RPC with failover) for every connected wallet, refreshed every two minutes and on demand. Each epoch pins the chain block and emits a SHA-256 receipt over the payout — see <code>/api/dividends</code> and <code>/api/holder?w=</code>.</p>
+ <p>All protocol revenue — origination, stability, perp taker/liquidation fees — accrues to a pot. At each quarter-hour: <b>40%</b> buys a tokenized stock at oracle price and is airdropped to $FOLIO holders pro-rata to balance; <b>30%</b> is added to locked FOLIO liquidity; <b>30%</b> is allocated to <b>$FOLIO buyback &amp; burn</b> (V2), tallied in fUSD and executed from the treasury at market — the burn is a permanent reduction in circulating supply. Stock rotation: NVDA → AAPL → GOOGL → HOOD → META → SPY. Holder weight is the <b>real $FOLIO balance read on BNB Chain</b> (ERC-20 <code>balanceOf</code>, public RPC with failover) for every connected wallet, refreshed every two minutes and on demand. Each epoch pins the chain block and emits a SHA-256 receipt over the payout — see <code>/api/dividends</code> and <code>/api/holder?w=</code>.</p>
 
  <h2>6 · Perpetuals</h2>
  <ul><li>Markets: BTC, ETH, BNB, SOL (max 25×); HOOD, NVDA, TSLA, SPY, COIN, MSTR, AAPL, GOOGL, META, GLD (max 10×).</li>
@@ -56,7 +56,20 @@
   <li>Funding hourly: <code>rate = clamp(±0.1%, k × (longOI − shortOI)/(longOI + shortOI))</code>; the heavier side pays.</li>
   <li>All perp fees flow to the dividend engine.</li></ul>
 
- <h2>7 · $FOLIO</h2>
+ <h2>7 · V2 — The Compounding Update</h2>
+ <h3>7.1 Holder boost</h3>
+ <p>Each wallet's <b>real $FOLIO balance</b> (BNB Chain <code>balanceOf</code>, refreshed every 2 minutes) maps to a tier by share of total supply. The tier multiplier applies to sfUSD APY, term-lock APY and Season points.</p>
+ <table><thead><tr><th>Tier</th><th class="num">Share of supply</th><th class="num">Multiplier</th><th class="num">sfUSD APY</th></tr></thead><tbody>
+  <tr><td>Paper</td><td class="num">—</td><td class="num">1.0×</td><td class="num">6%</td></tr><tr><td>Bronze</td><td class="num">≥ 0.01%</td><td class="num">1.5×</td><td class="num">9%</td></tr><tr><td>Silver</td><td class="num">≥ 0.1%</td><td class="num">2.0×</td><td class="num">12%</td></tr><tr><td>Gold</td><td class="num">≥ 0.5%</td><td class="num">2.5×</td><td class="num">15%</td></tr><tr><td>Diamond</td><td class="num">≥ 1%</td><td class="num">3.0×</td><td class="num">18%</td></tr></tbody></table>
+ <p>Mechanically, sfUSD stays a single share token: a staker's boost above 1× is minted to them as additional sfUSD shares every tick (<code>value × 6% × (mult − 1) × Δt / year</code>), funded from the surplus buffer.</p>
+ <h3>7.2 Term locks</h3>
+ <p>Fixed-term fUSD deposits (min 10 fUSD): <b>30d 12% · 90d 20% · 180d 30% · 365d 50%</b> base APY × tier multiplier, accrued continuously until maturity. Claim any time after maturity. Early exit returns principal + accrued yield minus a <b>10% principal penalty, burned</b> (removed from fUSD supply).</p>
+ <h3>7.3 Season 1 points (ends 2026-11-01)</h3>
+ <p>Airdrop pool = <b>5% of $FOLIO supply</b>, split pro-rata to points at season end. Points accrue every 3 seconds: term-locked 3/$/day (×1.3 / 1.6 / 2 for 90 / 180 / 365d), stability pool 2, open debt 1.5, staked 1; perp trades 0.5 per $100 notional; dividends 25 per $ of stock received; daily check-in 10 with a streak bonus of +5%/day to +50%. All points × tier multiplier. Referrals: referee +50, referrer receives 10% of the referee's points in perpetuity (<code>/app?ref=0x…</code>). Endpoints: <code>/api/season?w=</code>, <code>POST /api/lock</code>, <code>/api/unlock</code>, <code>/api/checkin</code>, <code>/api/ref</code>.</p>
+ <h3>7.4 Buyback &amp; burn</h3>
+ <p>30% of every epoch's revenue plus every early-exit penalty is tallied to the burn ledger (<code>burn.fusd</code>, and <code>burn.folio</code> at the DexScreener market price when available). Visible on the Dividends tab and landing folio card.</p>
+
+ <h2>8 · $FOLIO</h2>
  <p>The protocol token on BNB Chain. Holding it is what earns the 15-minute stock dividends. Nothing here is financial advice; overcollateralized lending and leveraged trading can lose money.</p>
 </div>
 <footer><div class="gold-rule"></div><div class="wrap"><span class="seals"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg></span><span>Folio · $FOLIO · BNB Chain</span><span>fUSD · sfUSD · dividends · perps</span></div></footer>

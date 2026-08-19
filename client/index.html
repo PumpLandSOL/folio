@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Folio — a folio of stocks, a dollar that pays</title><link rel="stylesheet" href="/folio.css"><link rel="stylesheet" href="/hl.css"><link rel="stylesheet" href="/landing.css">
-<meta property="og:url" content="https://foliobnb.xyz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@FolioBNB"><meta property="og:title" content="Folio — a folio of stocks, a dollar that pays"><meta property="og:description" content="Mint fUSD against tokenized equities. Stake it. Get paid in stock every 15 minutes. Trade perps with it. BNB Chain.">
+<meta property="og:url" content="https://foliobnb.xyz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@FolioBNB"><meta property="og:title" content="Folio — a folio of stocks, a dollar that pays"><meta property="og:description" content="V2 · The Compounding Update: sfUSD up to 18% with holder boost, term locks up to 50%, Season 1 airdrop (5% of supply), 30% of revenue to $FOLIO buyback & burn. BNB Chain.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23f8f6f2'/%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23b8933d' stroke-width='2'/%3E%3Ccircle cx='32' cy='30' r='11' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3Ccircle cx='19.5' cy='29' r='4.5' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3Ccircle cx='44.5' cy='29' r='4.5' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3C/svg%3E"><style>.castrip{display:inline-flex;align-items:center;gap:10px;margin:14px 0 0;padding:8px 12px;border:1px solid var(--rule,#e6e1d8);background:var(--card,#fffdf9);cursor:pointer;font-size:12px;max-width:100%}.castrip span{font-family:'Hanken Grotesk',sans-serif;font-weight:700;letter-spacing:.18em;text-transform:uppercase;font-size:10px;color:var(--gold,#b8933d);white-space:nowrap}.castrip code{font-family:'JetBrains Mono',monospace;color:var(--ink,#1c1b18);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.castrip em{font-style:normal;color:var(--mut,#8f8b82);white-space:nowrap}.castrip:hover em{color:var(--gold,#b8933d)}</style>
 </head>
 <body>
@@ -28,10 +28,11 @@
  <div class="hcopy">
   <div class="eyebrow"><span>No. 54</span><i></i><span>BNB Chain</span><i></i><span>Est. MMXXVI</span></div>
   <h1>A folio of stocks.<br>A dollar that <em>pays you back.</em></h1>
+  <div class="v2strip"><span class="tag acc">V2 · The Compounding Update</span> <b>Hold $FOLIO → up to 3× on every yield.</b> sfUSD to 18% · term locks to 50% · Season 1 airdrop 5% of supply · 30% of revenue buys back &amp; burns $FOLIO. <a href="/app">Enter →</a></div>
   <p class="lede">Deposit tokenized equities, mint <b>fUSD</b>. Stake it. Hold $FOLIO and receive stock every fifteen minutes. Trade perps on the very stocks that back it.</p>
   <div class="ctas"><a class="btn acc" href="/app">Mint fUSD</a><a class="btn ghost" href="#how">Read the mechanics</a></div>
   <div class="castrip" onclick="navigator.clipboard.writeText('0x2c4e63ead1936ba1fe963fa3cb918a7b34de7777');this.querySelector('em').textContent='copied';setTimeout(()=>this.querySelector('em').textContent='copy',1200)" title="Copy contract address"><span>$FOLIO · BNB</span><code>0x2c4e63ead1936ba1fe963fa3cb918a7b34de7777</code><em>copy</em></div>
-  <dl class="miniledger"><div><dt>Peg</dt><dd>$1.00</dd></div><div><dt>sfUSD target</dt><dd>6.00%</dd></div><div><dt>Borrow APR</dt><dd>3.00%</dd></div><div><dt>Dividend cadence</dt><dd>15 min</dd></div></dl>
+  <dl class="miniledger"><div><dt>Peg</dt><dd>$1.00</dd></div><div><dt>sfUSD APY</dt><dd>6 → 18%</dd></div><div><dt>Term lock APY</dt><dd>12 → 50%</dd></div><div><dt>Revenue burned</dt><dd>30%</dd></div><div><dt>Dividend cadence</dt><dd>15 min</dd></div></dl>
  </div>
  <div class="hobj">
   <svg class="seal wm2" aria-hidden="true"><use href="#zHorse"/></svg>
@@ -43,6 +44,8 @@
    <div class="fc-row gold"><span>Stock dividends paid</span><b id="kDiv">—</b></div>
    <div class="fc-row"><span>Next dividend</span><b id="kNext">—</b></div>
    <div class="fc-row"><span>Perp open interest</span><b id="kOI">—</b></div>
+   <div class="fc-row"><span>$FOLIO buyback &amp; burn</span><b id="kBurn">—</b></div>
+   <div class="fc-row"><span>Term-locked fUSD</span><b id="kLock">—</b></div>
    <div class="fc-tape" id="tape">loading oracle…</div>
   </div>
  </div>
@@ -52,7 +55,8 @@
  <section class="sec rule" id="ledger"><div class="sechead"><span class="caps">The ledger</span><h2>Four entries. One dollar.</h2></div>
   <div class="ledger">
    <a class="lrow" href="/app"><span class="lno">01</span><span class="lname"><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg>Hold</span><span class="ldesc">Stable dollars backed by tokenized equities, BNB and USDT. Redeemable 1:1 through the PSM.</span><span class="lval">$1.00<small>target peg</small></span></a>
-   <a class="lrow" href="/app"><span class="lno">02</span><span class="lname"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg>Stake</span><span class="ldesc">sfUSD accretes protocol revenue — stability fees first, surplus buffer second.</span><span class="lval">6.00%<small>est. apy</small></span></a>
+   <a class="lrow" href="/app"><span class="lno">02</span><span class="lname"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg>Stake</span><span class="ldesc">sfUSD accretes protocol revenue — and your on-chain $FOLIO balance multiplies it: Bronze 1.5× · Silver 2× · Gold 2.5× · Diamond 3×.</span><span class="lval">6–18%<small>boosted apy</small></span></a>
+   <a class="lrow" href="/app"><span class="lno">02b</span><span class="lname"><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg>Lock</span><span class="ldesc">Fixed-term fUSD locks — 30 / 90 / 180 / 365 days at 12 / 20 / 30 / 50% base, boosted by tier. Early exit burns 10%.</span><span class="lval">up to 150%<small>diamond · 365d</small></span></a>
    <a class="lrow" href="/app"><span class="lno">03</span><span class="lname"><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg>Borrow</span><span class="ldesc">Isolated vaults per stock. Tier-1 55/65, Tier-2 40/52, BNB 75/82, USDT 90/95.</span><span class="lval">3.00%<small>borrow apr</small></span></a>
    <a class="lrow" href="/app"><span class="lno">04</span><span class="lname"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg>Trade</span><span class="ldesc">Perpetuals on stocks and crypto, margined in fUSD, marked to Pyth.</span><span class="lval">25×<small>max leverage</small></span></a>
   </div>
@@ -63,7 +67,9 @@
    <li><b>Deposit</b><p>Approved stock tokens, BNB or USDT enter an isolated vault. Collateral stays on chain, visible, under tiered LTV and liquidation rules.</p></li>
    <li><b>Mint</b><p>fUSD is issued to LTV. 0.10% origination, 3.00% stability fee accruing by the second. Health below 1.0 is bought by the stability pool at a 5% discount.</p></li>
    <li><b>Earn</b><p>Every fee — origination, stability, perp taker, liquidation — lands in one revenue pot. sfUSD stakers draw on it first.</p></li>
-   <li><b>Distribute</b><p>At each quarter-hour, half the pot buys a tokenized stock at oracle and is airdropped to $FOLIO holders; half deepens locked liquidity.</p></li>
+   <li><b>Distribute</b><p>At each quarter-hour, 40% of the pot buys a tokenized stock at oracle and is airdropped to $FOLIO holders; 30% deepens locked liquidity; <b>30% buys back and burns $FOLIO</b>.</p></li>
+   <li><b>Boost</b><p>Your real $FOLIO balance on BNB Chain sets a 1× → 3× multiplier on sfUSD, term-lock yield and Season points. The more of the token you hold, the more every line pays.</p></li>
+   <li><b>Season</b><p>Season 1 (to 1 Nov 2026): every working dollar earns points every 3 seconds. Referrals pay 10% forever; streaks add up to +50%. 5% of $FOLIO supply is split pro-rata at season end.</p></li>
    <li><b>Trade</b><p>fUSD is margin. Long or short NVDA, HOOD, SPY, BTC, BNB — up to 25× — and every trade pays the next dividend.</p></li>
   </ol>
  </section>
@@ -91,8 +97,11 @@
  <section class="sec"><div class="sechead"><span class="caps">Against the field</span><h2>Compared to other stable dollars.</h2></div>
   <table class="cmp"><thead><tr><th></th><th>fUSD</th><th>nUSD</th><th>aUSD</th><th>USDC</th></tr></thead><tbody>
    <tr><td>Backed by</td><td>Stocks · BNB · USDT</td><td>Stocks · USDC</td><td>Stocks · BNB · USDT</td><td>Cash &amp; T-bills</td></tr>
-   <tr><td>Staked yield</td><td class="yes">6% target</td><td class="yes">6% target</td><td class="no">—</td><td class="no">—</td></tr>
+   <tr><td>Staked yield</td><td class="yes">6% → 18% boosted</td><td class="yes">6% target</td><td class="no">—</td><td class="no">—</td></tr>
    <tr><td>Stability pool</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td></tr>
+   <tr><td>Term locks</td><td class="yes">12–50% base · to 150%</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+   <tr><td>Token buyback &amp; burn</td><td class="yes">30% of revenue</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+   <tr><td>Points season / airdrop</td><td class="yes">5% of supply</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
    <tr><td>Stock dividends to holders</td><td class="yes">every 15 min</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
    <tr><td>Perps margined in it</td><td class="yes">✓ up to 25×</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
    <tr><td>Chain</td><td>BNB</td><td>Solana</td><td>Robinhood</td><td>Many</td></tr>
@@ -103,7 +112,10 @@
  <section class="sec"><div class="sechead"><span class="caps">Questions</span><h2>Asked, answered.</h2></div><div class="faq">
   <details open><summary>What is fUSD?</summary><p>A dollar minted against tokenized stocks, ETFs, BNB or USDT in isolated, overcollateralized vaults. Redeemable 1:1 for USDT through the PSM while reserves are idle.</p></details>
   <details><summary>Where does the yield come from?</summary><p>sfUSD is funded by borrower stability fees (3% APR) first and the surplus buffer second, targeting 6%. The stability pool earns liquidated collateral at a 5% discount. Dividends come from every protocol fee.</p></details>
-  <details><summary>How do the stock dividends work?</summary><p>Every 15 minutes the revenue pot is split: 50% buys a tokenized stock (rotating NVDA → AAPL → GOOGL → HOOD → META → SPY) at oracle price and is airdropped to $FOLIO holders pro-rata; 50% goes to locked FOLIO liquidity.</p></details>
+  <details><summary>How do the stock dividends work?</summary><p>Every 15 minutes the revenue pot is split: 40% buys a tokenized stock (rotating NVDA → AAPL → GOOGL → HOOD → META → SPY) at oracle price and is airdropped to $FOLIO holders pro-rata; 30% goes to locked FOLIO liquidity; 30% is allocated to $FOLIO buyback and burn, executed from the treasury at market.</p></details>
+  <details><summary>What is the holder boost?</summary><p>Your $FOLIO balance is read live on BNB Chain. Bronze (0.01% of supply) 1.5×, Silver (0.1%) 2×, Gold (0.5%) 2.5×, Diamond (1%) 3× — applied to sfUSD APY, term-lock APY and Season points.</p></details>
+  <details><summary>What are term locks?</summary><p>Fixed-term fUSD deposits: 30d 12%, 90d 20%, 180d 30%, 365d 50% base APY, multiplied by your tier. Yield accrues every 3 seconds; early exit burns 10% of principal.</p></details>
+  <details><summary>What is Season 1?</summary><p>A points program running to 1 November 2026. Staked, locked, pooled and borrowed dollars all earn points continuously; trades and dividends earn on top; referrals pay 10% forever; daily streaks add up to +50%. 5% of $FOLIO supply is split pro-rata at season end.</p></details>
   <details><summary>How do perps work?</summary><p>Isolated positions margined in fUSD, marked to Pyth. Up to 25× on BTC/ETH/BNB/SOL, 10× on stocks and ETFs. 0.06% taker fee, 0.5% maintenance margin, hourly funding.</p></details>
   <details><summary>Which chain?</summary><p>BNB Chain (EVM). Connect any EVM wallet.</p></details>
   <details><summary>Is this financial advice?</summary><p>No. Overcollateralized lending and leveraged trading can lose money.</p></details>
@@ -117,7 +129,7 @@ async function go(){const S=await (await fetch('/api/state')).json();
  $('tape').innerHTML=Object.entries(S.px).filter(([s])=>s!=='USDT').map(([s,v])=>`<span><b>${s}</b> $${fpx(v)}</span>`).join('');
  $('asof').textContent=new Date(S.t).toISOString().slice(0,16).replace('T',' ')+' UTC';
  $('kSupply').textContent=fmt(S.supply,0);$('kTvl').textContent='$'+fmt(S.tvl,0);$('kBack').textContent=S.backing?fmt(S.backing*100,0)+'%':'—';
- $('kDiv').textContent='$'+fmt(S.div.paid);$('kNext').textContent=cd(S.div.next-S.t);$('kOI').textContent='$'+fmt(S.perpOI,0);
+ $('kDiv').textContent='$'+fmt(S.div.paid);$('kBurn').textContent='$'+fmt(S.burn.fusd);$('kLock').textContent=fmt(S.locks.tvl,0)+' fUSD';$('kNext').textContent=cd(S.div.next-S.t);$('kOI').textContent='$'+fmt(S.perpOI,0);
  $('mk').innerHTML=`<div class="two"><table><thead><tr><th>Collateral</th><th class="num">Oracle</th><th class="num">LTV</th><th class="num">Liq</th></tr></thead><tbody>${Object.entries(S.markets).map(([s,m])=>`<tr><td><b>${s}</b> <span class="tag">${m.tier}</span></td><td class="num">$${fpx(m.px)}</td><td class="num">${(m.ltv*100).toFixed(0)}%</td><td class="num">${(m.liq*100).toFixed(0)}%</td></tr>`).join('')}</tbody></table>
  <table><thead><tr><th>Perp</th><th class="num">Mark</th><th class="num">Max lev</th></tr></thead><tbody>${S.perps.map(p=>`<tr><td><b>${p.sym}</b></td><td class="num">$${fpx(p.px)}</td><td class="num">${p.maxLev}×</td></tr>`).join('')}</tbody></table></div>`;
  const H=window.__hist=window.__hist||{};S.perps.forEach(p=>{(H[p.sym]=H[p.sym]||[]).push(p.px);if(H[p.sym].length>40)H[p.sym].shift()});
