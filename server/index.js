@@ -1,7 +1,7 @@
 // FOLIO — stock-backed stablecoin (fUSD) + staked yield + 15-minute stock dividends + perps.
 // BNB Chain. Dependency-free Node ≥18. Off-chain ledger, real Pyth oracle.
 'use strict';
-const http = require('http'), fs = require('fs'), path = require('path');
+const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 
 const PORT = +process.env.PORT || 8188;
 const ROOT = path.join(__dirname, '..');
@@ -56,6 +56,35 @@ async function pollFolio() {
     if (ps[0]) FOLIO_PRICE = +ps[0].priceUsd; } catch (e) {}
 }
 
+// ---------- BNB Chain reader (real $FOLIO holder balances) ----------
+const RPCS = (process.env.BSC_RPCS || 'https://bsc-rpc.publicnode.com,https://1rpc.io/bnb,https://bsc-dataseed.binance.org,https://bsc-dataseed1.defibit.io').split(',');
+const CHAIN = { ok: false, rpc: '', supply: 0, decimals: 18, symbol: '', block: 0, holders: {}, checked: 0, lastRead: 0, errs: 0 };
+async function rpc(method, params) {
+  let err; for (let i = 0; i < RPCS.length; i++) { const u = RPCS[((CHAIN.rpcIdx || 0) + i) % RPCS.length];
+    try { const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 6000);
+      const r = await fetch(u, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: ac.signal }); clearTimeout(tm);
+      const j = await r.json(); if (j.error) throw new Error(j.error.message); CHAIN.rpc = u; CHAIN.rpcIdx = RPCS.indexOf(u); return j.result; } catch (e) { err = e; CHAIN.errs++; } }
+  throw err || new Error('rpc');
+}
+const hexToNum = (h, dec) => { if (!h || h === '0x') return 0; const bi = BigInt(h); const d = BigInt(10) ** BigInt(dec || 18); return Number(bi / d) + Number(bi % d) / Number(d); };
+const call = (data) => rpc('eth_call', [{ to: FOLIO_MINT, data }, 'latest']);
+async function chainMeta() {
+  if (!FOLIO_MINT) return;
+  try {
+    const [sup, dec, blk] = await Promise.all([call('0x18160ddd'), call('0x313ce567'), rpc('eth_blockNumber', [])]);
+    CHAIN.decimals = Number(BigInt(dec)); CHAIN.supply = hexToNum(sup, CHAIN.decimals); CHAIN.block = Number(BigInt(blk)); CHAIN.ok = CHAIN.supply > 0; CHAIN.lastRead = now();
+    try { const sym = await call('0x95d89b41'); const hex = sym.slice(2); const len = parseInt(hex.slice(64, 128), 16); CHAIN.symbol = Buffer.from(hex.slice(128, 128 + len * 2), 'hex').toString('utf8'); } catch (e) {}
+  } catch (e) { CHAIN.ok = false; }
+}
+async function chainBalance(w) {  // real ERC-20 balanceOf on BNB Chain
+  const r = await call('0x70a08231' + w.slice(2).padStart(64, '0')); return hexToNum(r, CHAIN.decimals);
+}
+async function refreshHolders() {  // every connected wallet is re-read on-chain; dividends weight by REAL balance
+  if (!CHAIN.ok) return; const ws = Object.keys(db.users); let n = 0;
+  for (const w of ws) { try { const b = await chainBalance(w); const u = db.users[w]; if (u && u.folio !== b) { u.folio = b; DIRTY = true; } CHAIN.holders[w] = { bal: b, t: now() }; n++; } catch (e) {} }
+  CHAIN.checked = n; CHAIN.lastRead = now();
+}
+
 // ---------- collateral markets (Arrow tiers) ----------
 const MARKETS = {
   USDT:  { tier: 'Stable',   ltv: 0.90, liq: 0.95, cap: 5e6 },
@@ -88,7 +117,7 @@ const ev = (k, m, w) => { db.events.unshift({ t: now(), k, m, w: w ? short(w) : 
 
 function user(w) {
   w = w.toLowerCase();
-  if (!db.users[w]) { db.users[w] = { wallet: w, bal: { ...STARTER, fUSD: 0 }, folio: P.START_FOLIO, sShares: 0, spShares: 0, divs: {}, pnl: 0, t: now() }; ev('join', short(w) + ' joined'); save(); }
+  if (!db.users[w]) { db.users[w] = { wallet: w, bal: { ...STARTER, fUSD: 0 }, folio: CHAIN.ok ? 0 : P.START_FOLIO, sShares: 0, spShares: 0, divs: {}, pnl: 0, t: now() }; ev('join', short(w) + ' joined'); save(); if (CHAIN.ok) chainBalance(w).then((b) => { db.users[w].folio = b; CHAIN.holders[w] = { bal: b, t: now() }; save(); }).catch(() => {}); }
   return db.users[w];
 }
 const bal = (u, s) => u.bal[s] || 0;
@@ -175,7 +204,8 @@ function dividendTick() {
   const sym = STOCK_ROTATION[db.div.epoch % STOCK_ROTATION.length]; const px = PX[sym] || 0; if (!(px > 0)) { db.div.revenue += pot; return; }
   const shares = toStock / px; const holders = Object.values(db.users).filter((u) => u.folio > 0); const tot = holders.reduce((a, u) => a + u.folio, 0);
   for (const u of holders) { const s = shares * u.folio / tot; add(u, sym, s); u.divs[sym] = (u.divs[sym] || 0) + s; }
-  db.div.paid += toStock; db.div.history.unshift({ t, epoch: db.div.epoch, sym, usd: toStock, shares, px, holders: holders.length, lp: toLP }); if (db.div.history.length > 96) db.div.history.pop();
+  db.div.paid += toStock; const rec = { t, epoch: db.div.epoch, sym, usd: toStock, shares, px, holders: holders.length, lp: toLP, block: CHAIN.block, weight: tot, onchain: CHAIN.ok };
+  rec.receipt = crypto.createHash('sha256').update(JSON.stringify(rec)).digest('hex'); db.div.history.unshift(rec); if (db.div.history.length > 96) db.div.history.pop();
   ev('dividend', `epoch ${db.div.epoch}: $${toStock.toFixed(2)} of ${sym} airdropped to ${holders.length} holders · $${toLP.toFixed(2)} → locked LP`); save();
 }
 
@@ -220,14 +250,14 @@ function protocolView() {
   const perpOI = Object.values(db.positions).reduce((a, p) => a + p.size * (PX[p.sym] || 0), 0);
   return { t: now(), ok: PRICE_OK, px: PX, params: P, markets: byMkt, perps: Object.keys(PERPS).map((s) => ({ sym: s, px: PX[s] || 0, maxLev: PERPS[s], funding: db.funding[s] || { rate: 0, longOI: 0, shortOI: 0 } })),
     supply: db.supply, tvl, backing: db.supply > 0 ? tvl / db.supply : 0, psm: db.psmUSDT, surplus: db.surplus, stake: { pool: db.stake.pool, pps: stakePPS(), apy: P.STAKE_TARGET_APY }, sp: { pool: db.sp.pool, gains: db.sp.gains },
-    div: { ...db.div, next: db.div.next || 0, revenue: db.div.revenue }, perpOI, perpFees: db.perpFees, liqs: db.liqs.slice(0, 20), events: db.events.slice(0, 40), users: Object.keys(db.users).length, folio: { mint: FOLIO_MINT, price: FOLIO_PRICE } };
+    div: { ...db.div, next: db.div.next || 0, revenue: db.div.revenue }, perpOI, perpFees: db.perpFees, liqs: db.liqs.slice(0, 20), events: db.events.slice(0, 40), users: Object.keys(db.users).length, folio: { mint: FOLIO_MINT, price: FOLIO_PRICE, chain: { ok: CHAIN.ok, supply: CHAIN.supply, symbol: CHAIN.symbol, block: CHAIN.block, rpc: CHAIN.rpc, holdersRead: CHAIN.checked, lastRead: CHAIN.lastRead, decimals: CHAIN.decimals } } };
 }
 function meView(w) {
   const u = user(w); const vaults = Object.values(db.vaults).filter((v) => v.wallet === u.wallet).map((v) => { accrue(v); return vaultView(v); });
   const positions = Object.values(db.positions).filter((p) => p.wallet === u.wallet).map(posView);
   const sfusd = u.sShares * stakePPS(); const spVal = db.sp.shares > 0 ? db.sp.pool * u.spShares / db.sp.shares : 0;
   const nav = Object.entries(u.bal).reduce((a, [s, v]) => a + v * (s === 'fUSD' ? 1 : (PX[s] || 0)), 0) + vaults.reduce((a, v) => a + v.collValue - v.debt, 0) + sfusd + spVal + positions.reduce((a, p) => a + p.eq, 0);
-  return { wallet: u.wallet, bal: u.bal, folio: u.folio, vaults, positions, sfusd, sShares: u.sShares, spVal, spShares: u.spShares, divs: u.divs, pnl: u.pnl, nav };
+  return { wallet: u.wallet, bal: u.bal, folio: u.folio, folioShare: CHAIN.supply > 0 ? u.folio / CHAIN.supply : 0, onchain: CHAIN.ok && !!CHAIN.holders[u.wallet], vaults, positions, sfusd, sShares: u.sShares, spVal, spShares: u.spShares, divs: u.divs, pnl: u.pnl, nav };
 }
 
 // ---------- http ----------
@@ -238,6 +268,8 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x'); const p = url.pathname;
   try {
     if (p === '/api/state') { const w = (url.searchParams.get('w') || '').toLowerCase(); return json(res, 200, { ...protocolView(), me: isWallet(w) ? meView(w) : null }); }
+    if (p === '/api/holder') { const w = (url.searchParams.get('w') || '').toLowerCase(); if (!isWallet(w)) return json(res, 200, { error: 'wallet' }); try { const bal = await chainBalance(w); const u = db.users[w]; if (u) { u.folio = bal; save(); } CHAIN.holders[w] = { bal, t: now() }; return json(res, 200, { wallet: w, folio: bal, share: CHAIN.supply > 0 ? bal / CHAIN.supply : 0, block: CHAIN.block, rpc: CHAIN.rpc, mint: FOLIO_MINT }); } catch (e) { return json(res, 200, { error: 'chain read failed' }); } }
+    if (p === '/api/dividends') return json(res, 200, { mint: FOLIO_MINT, chain: CHAIN.ok, epoch: db.div.epoch, next: db.div.next, paid: db.div.paid, lp: db.div.lp, history: db.div.history });
     if (p === '/x') { res.writeHead(302, { location: 'https://x.com/FolioBNB' }); return res.end(); }
     if (req.method === 'POST' && p.startsWith('/api/')) {
       const d = await body(req); const w = (d.wallet || '').toLowerCase(); if (!isWallet(w)) return json(res, 200, { error: 'connect a wallet first' });
@@ -265,4 +297,5 @@ http.createServer(async (req, res) => {
 }).listen(PORT, () => console.log('FOLIO · fUSD + stock dividends + perps · :' + PORT));
 
 pollPyth(); pollFolio(); setInterval(pollPyth, 5000); setInterval(pollFolio, 60000);
+chainMeta().then(refreshHolders); setInterval(chainMeta, 60000); setInterval(refreshHolders, 120000);
 setInterval(() => { if (!PRICE_OK) return; liquidations(); perpTick(); stakeAccrue(); dividendTick(); }, 3000);

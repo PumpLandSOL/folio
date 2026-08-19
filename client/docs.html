@@ -47,7 +47,7 @@
  <p>When a vault's health factor drops below 1.0 the <b>stability pool</b> burns fUSD equal to the debt and receives collateral valued at <code>oracle × (1 − 5%)</code>, credited pro-rata to depositors. Any remaining collateral returns to the vault owner. If the pool is too shallow the <b>surplus buffer</b> (accumulated fees) absorbs the shortfall.</p>
 
  <h2>5 · Dividend engine (every 15 minutes)</h2>
- <p>All protocol revenue — origination, stability, perp taker/liquidation fees — accrues to a pot. At each quarter-hour: <b>50%</b> buys a tokenized stock at oracle price and is airdropped to $FOLIO holders pro-rata to balance; <b>50%</b> is added to locked FOLIO liquidity. Stock rotation: NVDA → AAPL → GOOGL → HOOD → META → SPY. Holder balances are read on-chain once <code>FOLIO_MINT</code> is set; until then each connected wallet carries an allocation.</p>
+ <p>All protocol revenue — origination, stability, perp taker/liquidation fees — accrues to a pot. At each quarter-hour: <b>50%</b> buys a tokenized stock at oracle price and is airdropped to $FOLIO holders pro-rata to balance; <b>50%</b> is added to locked FOLIO liquidity. Stock rotation: NVDA → AAPL → GOOGL → HOOD → META → SPY. Holder weight is the <b>real $FOLIO balance read on BNB Chain</b> (ERC-20 <code>balanceOf</code>, public RPC with failover) for every connected wallet, refreshed every two minutes and on demand. Each epoch pins the chain block and emits a SHA-256 receipt over the payout — see <code>/api/dividends</code> and <code>/api/holder?w=</code>.</p>
 
  <h2>6 · Perpetuals</h2>
  <ul><li>Markets: BTC, ETH, BNB, SOL (max 25×); HOOD, NVDA, TSLA, SPY, COIN, MSTR, AAPL, GOOGL, META, GLD (max 10×).</li>
