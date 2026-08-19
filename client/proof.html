@@ -1,0 +1,83 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Folio — proof</title><link rel="stylesheet" href="/folio.css">
+<meta property="og:title" content="Folio — proof"><meta property="og:description" content="Treasury on-chain. Every dividend epoch. Every burn allocation. Fees in vs. paid out. Verify, don't trust.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23f8f6f2'/%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23b8933d' stroke-width='2'/%3E%3Ccircle cx='32' cy='30' r='11' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3Ccircle cx='19.5' cy='29' r='4.5' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3Ccircle cx='44.5' cy='29' r='4.5' fill='none' stroke='%23b8933d' stroke-width='2.5'/%3E%3C/svg%3E">
+<style>
+.proof h1.hero{font-size:52px;margin:34px 0 6px}.proof .sub{color:var(--ink2);max-width:760px;font-size:15px;margin-bottom:26px}
+.live{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono';font-size:11px;color:var(--ink2);border:1px solid var(--rule);padding:6px 10px;background:var(--card)}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;animation:bl 1.4s infinite alternate}@keyframes bl{from{opacity:.3}to{opacity:1}}
+.meter{height:10px;background:var(--rule);position:relative;margin:10px 0 6px}.meter b{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--gold),#c9563f)}
+.meter i{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+a.tx{font-family:'JetBrains Mono';font-size:11px;color:var(--gold2)}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;margin:22px 0}
+.sec h2{font-size:28px;margin:34px 0 10px}
+.kv td:first-child{color:var(--ink2)}
+.spark{width:100%;height:70px;display:block}
+</style></head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+<symbol id="zMonkey" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" stroke-dasharray="1.5 3"/><circle cx="32" cy="32" r="26.5"/><circle cx="32" cy="29" r="11"/><circle cx="19.5" cy="28" r="4.2"/><circle cx="44.5" cy="28" r="4.2"/><path d="M24 31c1.5-6 5-9 8-9s6.5 3 8 9c-1.5 4.5-4.5 7.5-8 7.5s-6.5-3-8-7.5z"/><path d="M26.5 26.5c1-1 2.5-1.2 3.6-.6M33.9 25.9c1.1-.6 2.6-.4 3.6.6"/><circle cx="28.4" cy="28.8" r=".9" fill="currentColor"/><circle cx="35.6" cy="28.8" r=".9" fill="currentColor"/><path d="M31.2 33.2h1.6"/><path d="M32 40c-8 0-14 4-14 10M32 40c8 0 14 4 14 10M43 47c4-1 7 1 8 5s-2 6-5 4"/></symbol>
+<symbol id="zHorse" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" stroke-dasharray="1.5 3"/><circle cx="32" cy="32" r="26.5"/><path d="M18 52c2-14 6-24 14-30l3-8 3 7c6 1 10 6 13 15c1 3 1 5-1 7c-2 1-5 0-7-2c-3-2-6-2-8 0c-4 3-8 9-9 11"/><path d="M32 22c-3 2-5 5-6 9M35 21c-2 3-4 6-4 10M38 22c-2 3-3 6-3 9"/><circle cx="43" cy="30" r="1" fill="currentColor"/><path d="M48 39c.6.4 1 1 1 1.6"/><path d="M36 41c-2 1-4 3-5 5"/></symbol></svg>
+<header class="top"><div class="wrap">
+ <a class="brand" href="/"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><b>Folio</b></a>
+ <nav><a href="/">Home</a><a href="/app">fUSD</a><a class="on" href="/proof">Proof</a><a href="/docs">Docs</a><a href="/x" target="_blank" rel="noopener">𝕏</a><a class="btn acc mini" href="/app">Open app</a></nav>
+</div></header>
+<div class="wrap proof">
+ <h1 class="hero serif">Proof.</h1>
+ <p class="sub">Verify, don't trust. The treasury wallet is public on BNB Chain. Every 15-minute epoch is receipted with the block it was pinned to. Fees in, stock out, $FOLIO burn allocated — all on one page, refreshed live.</p>
+ <span class="live"><i></i><span id="live">connecting…</span></span>
+
+ <div class="grid3">
+  <div class="panel"><span class="kicker">Treasury · BNB Chain</span><h3 id="tAddr" style="font-family:'JetBrains Mono';font-size:14px;word-break:break-all">—</h3>
+   <table class="kv"><tbody id="tRows"></tbody></table>
+   <p style="font-size:11px;color:var(--mut);margin-top:8px">Read directly from the chain via public RPC every 60 s. <a id="tScan" href="#" target="_blank" rel="noopener" style="color:var(--gold)">open on BscScan ↗</a></p></div>
+  <div class="panel" style="border-color:var(--gold)"><span class="kicker">Fees in → paid out</span>
+   <table class="kv"><tbody id="fRows"></tbody></table>
+   <p style="font-size:11px;color:var(--mut);margin-top:8px">Every protocol fee lands in one pot. The pot is split at each quarter-hour. Nothing else leaves it.</p></div>
+  <div class="panel"><span class="kicker">Dynamic burn · V2.1</span><h3 style="font-size:34px"><span id="bShare">—</span> <span style="font-size:13px;color:var(--mut)">of this epoch's revenue → $FOLIO buyback &amp; burn</span></h3>
+   <div class="meter"><b id="bBar" style="width:0"></b><i style="left:0"></i><i style="left:100%"></i></div>
+   <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono';font-size:10px;color:var(--mut)"><span>30% · at / above 7-day avg</span><span>60% · 20% below</span></div>
+   <table class="kv" style="margin-top:10px"><tbody id="bRows"></tbody></table>
+   <svg class="spark" id="spark" viewBox="0 0 300 70" preserveAspectRatio="none"></svg>
+   <p style="font-size:11px;color:var(--mut)">The protocol buys hardest when the chart is weakest. Burn share is read at the top of every epoch and recorded in that epoch's receipt.</p></div>
+ </div>
+
+ <div class="sec"><h2 class="serif">Solvency</h2><div class="statement" style="margin:0"><div class="stats" id="sStats"></div></div></div>
+
+ <div class="sec"><h2 class="serif">Every epoch, receipted</h2>
+  <p style="font-size:12px;color:var(--mut);margin-bottom:10px">SHA-256 over the payout record · pinned to the BNB Chain block at payout · stock bought at Pyth oracle · holder weight = real on-chain $FOLIO balance. Also at <code>/api/dividends</code> and <code>/api/proof</code>.</p>
+  <div style="overflow:auto"><table><thead><tr><th>Epoch</th><th>UTC</th><th>Block</th><th>Stock</th><th class="num">Stock $</th><th class="num">Shares</th><th class="num">@ oracle</th><th class="num">Holders</th><th class="num">→ LP</th><th class="num">→ Burn</th><th class="num">Burn %</th><th>Receipt</th></tr></thead><tbody id="eRows"></tbody></table></div></div>
+
+ <div class="sec"><h2 class="serif">Deposits credited</h2>
+  <p style="font-size:12px;color:var(--mut);margin-bottom:10px">Every treasury deposit is verified against its transaction on BNB Chain before it is credited.</p>
+  <div style="overflow:auto"><table><thead><tr><th>Tx</th><th>Block</th><th>Asset</th><th class="num">Amount</th><th>Wallet</th><th>UTC</th></tr></thead><tbody id="dRows"></tbody></table></div></div>
+
+ <div class="sec"><h2 class="serif">What is and isn't on-chain</h2>
+  <table><tbody>
+   <tr><td>Treasury balances (BNB / USDT / $FOLIO)</td><td><span class="tag acc">on-chain</span> read live</td></tr>
+   <tr><td>Deposits into the treasury</td><td><span class="tag acc">on-chain</span> tx-verified before credit</td></tr>
+   <tr><td>$FOLIO holder weights for dividends &amp; boost</td><td><span class="tag acc">on-chain</span> ERC-20 balanceOf, every 2 min</td></tr>
+   <tr><td>Collateral &amp; perp marks</td><td><span class="tag acc">oracle</span> Pyth, every 5 s</td></tr>
+   <tr><td>fUSD ledger, vaults, sfUSD, locks, points</td><td><span class="tag">protocol ledger</span> receipted per epoch, block-pinned</td></tr>
+   <tr><td>Stock airdrop · LP · buyback &amp; burn</td><td><span class="tag">allocated per epoch</span> executed from the treasury at market</td></tr>
+  </tbody></table>
+  <p style="font-size:11px;color:var(--mut);margin-top:10px">We'd rather show you the line between on-chain and ledger than blur it. Nothing here is financial advice.</p></div>
+</div>
+<footer><div class="gold-rule"></div><div class="wrap"><span class="seals"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg></span><span>Folio · $FOLIO · BNB Chain</span><span>fUSD · sfUSD · dividends · burn · perps</span></div></footer>
+<script>
+const $=id=>document.getElementById(id);const fmt=(v,d=2)=>(+v||0).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});const fpx=v=>v>=1000?fmt(v,2):v>=1?fmt(v,v>=100?2:3):(+v).toFixed(8);
+const row=(k,v)=>`<tr><td>${k}</td><td class="num">${v}</td></tr>`;
+async function go(){const P=await (await fetch('/api/proof')).json();
+ $('live').textContent=(P.chain?'on-chain · block '+P.block+' · '+(P.rpc||'').replace(/^https?:\/\//,''):'chain read pending')+' · '+new Date(P.t).toISOString().slice(11,19)+' UTC';
+ $('tAddr').textContent=P.treasury.addr;$('tScan').href='https://bscscan.com/address/'+P.treasury.addr;const o=P.treasury.onchain||{};
+ $('tRows').innerHTML=row('BNB',fmt(o.BNB||0,4))+row('USDT',fmt(o.USDT||0))+row('$FOLIO',fmt(o.FOLIO||0,0))+row('credited BNB / USDT',fmt(P.treasury.credited.BNB||0,4)+' / '+fmt(P.treasury.credited.USDT||0))+row('$FOLIO price',P.folio.price?'$'+fpx(P.folio.price):'—')+row('DEX liquidity',P.folio.liq?'$'+fmt(P.folio.liq,0):'—');
+ const R=P.revenue;$('fRows').innerHTML=row('fees collected · all-time','$'+fmt(R.allTime))+row('→ stock airdropped','$'+fmt(R.stockPaid))+row('→ locked LP','$'+fmt(R.lp))+row('→ $FOLIO buyback &amp; burn','<b style="color:var(--red)">$'+fmt(R.burn.fusd)+'</b>')+row('burned · $FOLIO at market',fmt(R.burn.folio,0))+row('pending this epoch','$'+fmt(R.pendingEpoch))+row('epochs paid',R.epochs);
+ const D=R.dyn;$('bShare').textContent=(D.share*100).toFixed(1)+'%';$('bBar').style.width=((D.share-R.base)/(R.max-R.base)*100).toFixed(1)+'%';
+ $('bRows').innerHTML=row('$FOLIO now',D.px?'$'+fpx(D.px):'—')+row('7-day average',D.avg?'$'+fpx(D.avg):'warming up')+row('deviation',(D.dev>0.00005?'−'+(D.dev*100).toFixed(2)+'% below avg':D.dev<-0.00005?'+'+(-D.dev*100).toFixed(2)+'% above avg':'at avg'))+row('price samples · 5 min',D.samples);
+ const h=P.pxHist||[];if(h.length>1){const mn=Math.min(...h.map(x=>x.p)),mx=Math.max(...h.map(x=>x.p)),r=mx-mn||1;const pts=h.map((x,i)=>(i/(h.length-1)*300).toFixed(1)+','+(66-(x.p-mn)/r*60).toFixed(1)).join(' ');const ay=66-(D.avg-mn)/r*60;$('spark').innerHTML=`<line x1="0" x2="300" y1="${ay}" y2="${ay}" stroke="#b8933d" stroke-dasharray="3 3" stroke-width="1"/><polyline points="${pts}" fill="none" stroke="#1c1b18" stroke-width="1.4"/>`}
+ const F=P.fusd;$('sStats').innerHTML=`<div class="stat"><b>${fmt(F.supply,0)}</b><span>fUSD supply</span></div><div class="stat"><b>$${fmt(F.tvl,0)}</b><span>collateral + PSM</span></div><div class="stat acc"><b>${F.supply>0?fmt(F.tvl/F.supply*100,0)+'%':'—'}</b><span>backing ratio</span></div><div class="stat"><b>${fmt(F.staked,0)}</b><span>staked · sfUSD ${F.pps.toFixed(5)}</span></div><div class="stat"><b>${fmt(F.locked,0)}</b><span>term-locked</span></div><div class="stat"><b>${fmt(F.sp,0)}</b><span>stability pool</span></div><div class="stat"><b>${fmt(F.surplus)}</b><span>surplus buffer</span></div><div class="stat"><b>${P.holders} / ${P.users}</b><span>holders / wallets</span></div>`;
+ $('eRows').innerHTML=P.epochs.map(e=>`<tr><td>${e.epoch}</td><td>${new Date(e.t).toISOString().slice(5,16).replace('T',' ')}</td><td>${e.block?'<a class="tx" href="https://bscscan.com/block/'+e.block+'" target="_blank" rel="noopener">'+e.block+'</a>':'—'}</td><td><b>${e.sym}</b></td><td class="num">$${fmt(e.usd)}</td><td class="num">${fmt(e.shares,5)}</td><td class="num">$${fpx(e.px)}</td><td class="num">${e.holders}</td><td class="num">${fmt(e.lp)}</td><td class="num" style="color:var(--red)">${fmt(e.burn||0)}</td><td class="num">${e.burnShare?(e.burnShare*100).toFixed(0)+'%':'—'}</td><td><span class="tx" title="${e.receipt}">${e.receipt?e.receipt.slice(0,14)+'…':'—'}</span></td></tr>`).join('')||'<tr><td colspan=12 style="color:var(--mut)">first epoch pays at the next quarter-hour</td></tr>';
+ $('dRows').innerHTML=P.treasury.txs.reverse().map(x=>`<tr><td><a class="tx" href="https://bscscan.com/tx/${x.tx}" target="_blank" rel="noopener">${x.tx.slice(0,14)}…</a></td><td>${x.block}</td><td>${x.sym}</td><td class="num">${fmt(x.amt,4)}</td><td style="font-family:'JetBrains Mono';font-size:11px">${x.w.slice(0,6)}…${x.w.slice(-4)}</td><td>${new Date(x.t).toISOString().slice(0,16).replace('T',' ')}</td></tr>`).join('')||'<tr><td colspan=6 style="color:var(--mut)">no deposits yet</td></tr>';
+}
+go();setInterval(go,6000);
+</script></body></html>

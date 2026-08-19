@@ -19,7 +19,7 @@
 </symbol></svg>
 <header class="top"><div class="wrap">
  <a class="brand" href="/"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><b>Folio</b></a>
- <nav><a href="/">Home</a><a href="/app">fUSD</a><a class="on" href="/docs">Docs</a><a href="/x" target="_blank" rel="noopener">𝕏</a><a class="btn acc mini" href="/app">Open app</a></nav>
+ <nav><a href="/">Home</a><a href="/app">fUSD</a><a href="/proof">Proof</a><a class="on" href="/docs">Docs</a><a href="/x" target="_blank" rel="noopener">𝕏</a><a class="btn acc mini" href="/app">Open app</a></nav>
 </div></header>
 <div class="wrap doc">
  <h1 class="hero" style="font-size:52px">Docs.</h1>
@@ -66,10 +66,14 @@
  <p>Fixed-term fUSD deposits (min 10 fUSD): <b>30d 12% · 90d 20% · 180d 30% · 365d 50%</b> base APY × tier multiplier, accrued continuously until maturity. Claim any time after maturity. Early exit returns principal + accrued yield minus a <b>10% principal penalty, burned</b> (removed from fUSD supply).</p>
  <h3>7.3 Season 1 points (ends 2026-11-01)</h3>
  <p>Airdrop pool = <b>5% of $FOLIO supply</b>, split pro-rata to points at season end. Points accrue every 3 seconds: term-locked 3/$/day (×1.3 / 1.6 / 2 for 90 / 180 / 365d), stability pool 2, open debt 1.5, staked 1; perp trades 0.5 per $100 notional; dividends 25 per $ of stock received; daily check-in 10 with a streak bonus of +5%/day to +50%. All points × tier multiplier. Referrals: referee +50, referrer receives 10% of the referee's points in perpetuity (<code>/app?ref=0x…</code>). Endpoints: <code>/api/season?w=</code>, <code>POST /api/lock</code>, <code>/api/unlock</code>, <code>/api/checkin</code>, <code>/api/ref</code>.</p>
- <h3>7.4 Buyback &amp; burn</h3>
+ <h3>7.4 Buyback &amp; burn — dynamic (V2.1)</h3>
+ <p>The burn share is <b>not fixed</b>. At the top of each epoch the protocol compares the $FOLIO market price (DexScreener, sampled every 5 min) to its 7-day average: <code>share = 30% + 30% × clamp((avg − px) / avg ÷ 20%, 0, 1)</code>. At or above the average: 30%. Twenty percent below: 60%. The extra comes out of the LP share (stock airdrop stays 40%). The share used is recorded in each epoch receipt. Live at <a href="/proof">/proof</a>.</p>
  <p>30% of every epoch's revenue plus every early-exit penalty is tallied to the burn ledger (<code>burn.fusd</code>, and <code>burn.folio</code> at the DexScreener market price when available). Visible on the Dividends tab and landing folio card.</p>
 
- <h2>8 · $FOLIO</h2>
+ <h2>8 · Proof</h2>
+ <p><a href="/proof">/proof</a> is the transparency page: treasury balances read from BNB Chain, every tx-verified deposit, fees collected vs. stock paid / LP / burn, every block-pinned epoch receipt, the live dynamic-burn meter, and an explicit table of what is on-chain versus protocol ledger. JSON at <code>/api/proof</code>.</p>
+
+ <h2>9 · $FOLIO</h2>
  <p>The protocol token on BNB Chain. Holding it is what earns the 15-minute stock dividends. Nothing here is financial advice; overcollateralized lending and leveraged trading can lose money.</p>
 </div>
 <footer><div class="gold-rule"></div><div class="wrap"><span class="seals"><svg class="seal" aria-hidden="true"><use href="#zMonkey"/></svg><svg class="seal" aria-hidden="true"><use href="#zHorse"/></svg></span><span>Folio · $FOLIO · BNB Chain</span><span>fUSD · sfUSD · dividends · perps</span></div></footer>

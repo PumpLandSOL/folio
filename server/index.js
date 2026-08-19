@@ -39,6 +39,8 @@ const P = {
   SEASON_END: Date.UTC(2026, 10, 1),   // Season 1 ends 2026-11-01
   PTS: { stake: 1, lock: 3, sp: 2, debt: 1.5, trade: 0.5, dividend: 0.25 },  // points per $ per day (trade: per $100 notional)
   REF_BONUS: 0.10, STREAK_STEP: 0.05, STREAK_MAX: 0.50,
+  BURN_MAX: 0.60, BURN_FULL_DEV: 0.20,   // V2.1 dynamic burn: share rises 30% → 60% linearly as $FOLIO trades up to 20% below its 7-day average (taken from the LP share)
+  PX_WINDOW: 7 * 86400e3,
 };
 
 // ---------- oracle ----------
@@ -62,12 +64,19 @@ async function pollPyth() {
     PRICE_OK = true;
   } catch (e) {}
 }
-let FOLIO_PRICE = 0;
+let FOLIO_PRICE = 0, FOLIO_LIQ = 0, FOLIO_PAIR = '';
+// ---------- V2.1 · dynamic burn: price memory ----------
+function pxSample(px) { if (!(px > 0)) return; db.pxHist = db.pxHist || []; const last = db.pxHist[db.pxHist.length - 1]; if (last && now() - last.t < 5 * 60e3) { last.p = px; return; } db.pxHist.push({ t: now(), p: px }); const cut = now() - P.PX_WINDOW; while (db.pxHist.length && db.pxHist[0].t < cut) db.pxHist.shift(); save(); }
+function avg7() { const h = db.pxHist || []; if (!h.length) return 0; return h.reduce((a, x) => a + x.p, 0) / h.length; }
+function burnShare() {   // 30% base; every 1% below 7d avg adds 1.5 pts, capped at 60% (20% below)
+  const a = avg7(); if (!(a > 0) || !(FOLIO_PRICE > 0)) return { share: P.BUYBACK_SPLIT, avg: a, px: FOLIO_PRICE, dev: 0, samples: (db.pxHist || []).length };
+  const dev = (a - FOLIO_PRICE) / a; const k = clamp(0, 1, dev / P.BURN_FULL_DEV); return { share: P.BUYBACK_SPLIT + (P.BURN_MAX - P.BUYBACK_SPLIT) * k, avg: a, px: FOLIO_PRICE, dev, samples: (db.pxHist || []).length };
+}
 async function pollFolio() {
   if (!FOLIO_MINT) return;
   try { const r = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + FOLIO_MINT); if (!r.ok) return;
     const ps = ((await r.json()).pairs || []).filter((p) => p.chainId === 'bsc' && +p.priceUsd > 0).sort((a, b) => ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0));
-    if (ps[0]) FOLIO_PRICE = +ps[0].priceUsd; } catch (e) {}
+    if (ps[0]) { FOLIO_PRICE = +ps[0].priceUsd; FOLIO_LIQ = (ps[0].liquidity && ps[0].liquidity.usd) || 0; FOLIO_PAIR = ps[0].pairAddress || ''; pxSample(FOLIO_PRICE); } } catch (e) {}
 }
 
 // ---------- BNB Chain reader (real $FOLIO holder balances) ----------
@@ -302,13 +311,13 @@ function dividendTick() {
   const t = now(); if (!db.div.next) db.div.next = Math.ceil(t / P.DIVIDEND_EPOCH) * P.DIVIDEND_EPOCH; if (t < db.div.next) return;
   db.div.next += P.DIVIDEND_EPOCH; db.div.epoch++;
   const pot = db.div.revenue; db.div.revenue = 0; if (pot <= 0) { save(); return; }
-  const toBurn = pot * P.BUYBACK_SPLIT, toLP = pot * (1 - P.DIVIDEND_SPLIT - P.BUYBACK_SPLIT), toStock = pot * P.DIVIDEND_SPLIT; db.div.lp += toLP;
+  const BS = burnShare(); const toBurn = pot * BS.share, toLP = pot * (1 - P.DIVIDEND_SPLIT - BS.share), toStock = pot * P.DIVIDEND_SPLIT; db.div.lp += toLP;
   db.burn.fusd += toBurn; if (FOLIO_PRICE > 0) db.burn.folio += toBurn / FOLIO_PRICE; db.burn.epochs++; db.supply -= toBurn;
   const sym = STOCK_ROTATION[db.div.epoch % STOCK_ROTATION.length]; const px = PX[sym] || 0; if (!(px > 0)) { db.div.revenue += pot; return; }
   const shares = toStock / px; const holders = Object.values(db.users).filter((u) => u.folio > 0); const tot = holders.reduce((a, u) => a + u.folio, 0);
   for (const u of holders) { const s = shares * u.folio / tot; add(u, sym, s); u.divs[sym] = (u.divs[sym] || 0) + s; }
   db.div.paid += toStock; for (const u of holders) ptsAdd(u, 'dividend', toStock * u.folio / tot * P.PTS.dividend * 100);
-  const rec = { t, epoch: db.div.epoch, sym, usd: toStock, shares, px, holders: holders.length, lp: toLP, burn: toBurn, block: CHAIN.block, weight: tot, onchain: CHAIN.ok };
+  const rec = { t, epoch: db.div.epoch, sym, usd: toStock, shares, px, holders: holders.length, lp: toLP, burn: toBurn, burnShare: BS.share, folioPx: FOLIO_PRICE, avg7: BS.avg, block: CHAIN.block, weight: tot, onchain: CHAIN.ok };
   rec.receipt = crypto.createHash('sha256').update(JSON.stringify(rec)).digest('hex'); db.div.history.unshift(rec); if (db.div.history.length > 96) db.div.history.pop();
   ev('dividend', `epoch ${db.div.epoch}: ${toStock.toFixed(2)} of ${sym} airdropped to ${holders.length} holders · ${toLP.toFixed(2)} → LP · ${toBurn.toFixed(2)} → $FOLIO buyback & burn`); save();
 }
@@ -353,7 +362,7 @@ function protocolView() {
   const byMkt = {}; for (const s of Object.keys(MARKETS)) byMkt[s] = { ...MARKETS[s], px: PX[s] || 0, coll: 0, debt: 0 }; for (const v of vaults) { byMkt[v.sym].coll += v.coll; byMkt[v.sym].debt += v.debt; }
   const perpOI = Object.values(db.positions).reduce((a, p) => a + p.size * (PX[p.sym] || 0), 0);
   return { t: now(), ok: PRICE_OK, px: PX, params: P, markets: byMkt, perps: Object.keys(PERPS).map((s) => ({ sym: s, px: PX[s] || 0, maxLev: PERPS[s], funding: db.funding[s] || { rate: 0, longOI: 0, shortOI: 0 } })),
-    supply: db.supply, tvl, backing: db.supply > 0 ? tvl / db.supply : 0, psm: db.psmUSDT, surplus: db.surplus, stake: { pool: db.stake.pool, pps: stakePPS(), apy: P.STAKE_TARGET_APY, maxApy: P.STAKE_TARGET_APY * P.BOOST_TIERS[P.BOOST_TIERS.length - 1].mult }, locks: { terms: P.LOCK_TERMS, tvl: Object.values(db.locks).reduce((a, L) => a + L.amt, 0), n: Object.keys(db.locks).length, penalty: P.LOCK_EARLY_PENALTY }, burn: db.burn, tiers: P.BOOST_TIERS, season: seasonView(null), sp: { pool: db.sp.pool, gains: db.sp.gains },
+    supply: db.supply, tvl, backing: db.supply > 0 ? tvl / db.supply : 0, psm: db.psmUSDT, surplus: db.surplus, stake: { pool: db.stake.pool, pps: stakePPS(), apy: P.STAKE_TARGET_APY, maxApy: P.STAKE_TARGET_APY * P.BOOST_TIERS[P.BOOST_TIERS.length - 1].mult }, locks: { terms: P.LOCK_TERMS, tvl: Object.values(db.locks).reduce((a, L) => a + L.amt, 0), n: Object.keys(db.locks).length, penalty: P.LOCK_EARLY_PENALTY }, burn: { ...db.burn, dyn: burnShare(), max: P.BURN_MAX, base: P.BUYBACK_SPLIT }, tiers: P.BOOST_TIERS, season: seasonView(null), sp: { pool: db.sp.pool, gains: db.sp.gains },
     div: { ...db.div, next: db.div.next || 0, revenue: db.div.revenue }, perpOI, perpFees: db.perpFees, liqs: db.liqs.slice(0, 20), events: db.events.slice(0, 40), users: Object.keys(db.users).length, treasury: { addr: TREASURY, onchain: CHAIN.treasury || null, credited: db.treasury || {}, tokens: { USDT: TOKENS.USDT.addr } }, folio: { mint: FOLIO_MINT, price: FOLIO_PRICE, chain: { ok: CHAIN.ok, supply: CHAIN.supply, symbol: CHAIN.symbol, block: CHAIN.block, rpc: CHAIN.rpc, holdersRead: CHAIN.checked, lastRead: CHAIN.lastRead, decimals: CHAIN.decimals } } };
 }
 function meView(w) {
@@ -374,6 +383,11 @@ http.createServer(async (req, res) => {
   try {
     if (p === '/api/state') { const w = (url.searchParams.get('w') || '').toLowerCase(); return json(res, 200, { ...protocolView(), me: isWallet(w) ? meView(w) : null }); }
     if (p === '/api/holder') { const w = (url.searchParams.get('w') || '').toLowerCase(); if (!isWallet(w)) return json(res, 200, { error: 'wallet' }); try { const bal = await chainBalance(w); const u = db.users[w]; if (u) { u.folio = bal; save(); } CHAIN.holders[w] = { bal, t: now() }; return json(res, 200, { wallet: w, folio: bal, share: CHAIN.supply > 0 ? bal / CHAIN.supply : 0, block: CHAIN.block, rpc: CHAIN.rpc, mint: FOLIO_MINT }); } catch (e) { return json(res, 200, { error: 'chain read failed' }); } }
+    if (p === '/api/proof') { const h = db.div.history; const fees = db.div.paid + db.div.lp + db.burn.fusd + db.div.revenue; return json(res, 200, { t: now(), chain: CHAIN.ok, block: CHAIN.block, rpc: CHAIN.rpc, mint: FOLIO_MINT, pair: FOLIO_PAIR, folio: { price: FOLIO_PRICE, liq: FOLIO_LIQ, supply: CHAIN.supply, symbol: CHAIN.symbol },
+      treasury: { addr: TREASURY, onchain: CHAIN.treasury || null, credited: db.treasury || {}, txs: Object.entries(db.txs || {}).slice(-50).map(([h, x]) => ({ tx: h, ...x })) },
+      fusd: { supply: db.supply, tvl: protocolView().tvl, psm: db.psmUSDT, surplus: db.surplus, staked: db.stake.pool, pps: stakePPS(), sp: db.sp.pool, locked: Object.values(db.locks).reduce((a, L) => a + L.amt, 0) },
+      revenue: { allTime: fees, pendingEpoch: db.div.revenue, stockPaid: db.div.paid, lp: db.div.lp, burn: db.burn, epochs: db.div.epoch, burnEpochs: db.burn.epochs, dyn: burnShare(), base: P.BUYBACK_SPLIT, max: P.BURN_MAX },
+      epochs: h, holders: Object.values(db.users).filter((u) => u.folio > 0).length, users: Object.keys(db.users).length, pxHist: db.pxHist || [] }); }
     if (p === '/api/season') { const w = (url.searchParams.get('w') || '').toLowerCase(); return json(res, 200, seasonView(isWallet(w) ? user(w) : null)); }
     if (p === '/api/dividends') return json(res, 200, { mint: FOLIO_MINT, chain: CHAIN.ok, epoch: db.div.epoch, next: db.div.next, paid: db.div.paid, lp: db.div.lp, history: db.div.history });
     if (p === '/x') { res.writeHead(302, { location: 'https://x.com/FolioBNB' }); return res.end(); }
@@ -401,7 +415,7 @@ http.createServer(async (req, res) => {
       }
       return json(res, 200, { ok: true, r, me: meView(w) });
     }
-    let fp = p === '/' ? '/index.html' : p === '/app' ? '/app.html' : p === '/docs' ? '/docs.html' : p;
+    let fp = p === '/' ? '/index.html' : p === '/app' ? '/app.html' : p === '/docs' ? '/docs.html' : p === '/proof' ? '/proof.html' : p;
     fp = path.join(ROOT, 'client', path.normalize(fp).replace(/^(\.\.[\/\\])+/, ''));
     fs.readFile(fp, (err, buf) => { if (err) { res.writeHead(404); return res.end('not found'); } res.writeHead(200, { 'content-type': MIME[path.extname(fp)] || 'application/octet-stream' }); res.end(buf); });
   } catch (e) { json(res, 200, { error: String(e && e.message || e) }); }
