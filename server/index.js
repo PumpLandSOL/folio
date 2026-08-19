@@ -6,7 +6,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const PORT = +process.env.PORT || 8188;
 const ROOT = path.join(__dirname, '..');
 const DATA_PATH = process.env.DATA_PATH || path.join(ROOT, 'data.json');
-const FOLIO_MINT = process.env.FOLIO_MINT || '';
+const FOLIO_MINT = process.env.FOLIO_MINT || '0x2c4e63ead1936ba1fe963fa3cb918a7b34de7777';
 const now = () => Date.now();
 const isWallet = (s) => /^0x[a-fA-F0-9]{40}$/.test(s || '');
 const short = (w) => (w || '').slice(0, 6) + '…' + (w || '').slice(-4);
